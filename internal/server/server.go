@@ -4,17 +4,26 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
+	"github.com/caarlos0/env/v6"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/LidaSv/Gofermart.git/internal/handlers"
 )
+
+type Configs struct {
+	RunAddress           string `env:"RUN_ADDRESS" envDefault:"localhost:8080"`
+	AccrualSystemAddress string `env:"ACCRUAL_SYSTEM_ADDRESS"`
+	DatabaseUri          string `env:"DATABASE_URI"`
+	//envDefault:"host=localhost port=6422 user=postgres password=123 dbname=postgres"
+}
 
 func ConnectDB(dbURL *string) (*pgxpool.Pool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -29,9 +38,15 @@ func ConnectDB(dbURL *string) (*pgxpool.Pool, error) {
 
 func AddServer() {
 
-	FlagServerAddress := flag.String("a", "localhost:8090", "a string")
-	AccrualSystemAddress := flag.String("f", "FlagServerAddress", "a string")
-	FlagDatabaseDsn := flag.String("d", "host=localhost port=6422 user=postgres password=123 dbname=postgres", "a string")
+	var cfg Configs
+	err := env.Parse(&cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	FlagServerAddress := flag.String("a", cfg.RunAddress, "a string")
+	AccrualSystemAddress := flag.String("r", cfg.RunAddress, "a string")
+	FlagDatabaseDsn := flag.String("d", cfg.DatabaseUri, "a string")
 	flag.Parse()
 
 	db, err := ConnectDB(FlagDatabaseDsn)
@@ -94,9 +109,20 @@ func AddServer() {
 		r.Get("/withdrawals", s.UsersWithdrawals)
 	})
 
+	replacer := strings.NewReplacer("https://", "", "http://", "")
+	ServerAdd := replacer.Replace(*FlagServerAddress)
+
+	if ServerAdd[len(ServerAdd)-1:] == "/" {
+		ServerAdd = ServerAdd[:len(ServerAdd)-1]
+	}
+
 	server := &http.Server{
-		Addr:    *FlagServerAddress,
-		Handler: r,
+		Addr:              ServerAdd,
+		Handler:           r,
+		ReadHeaderTimeout: time.Second,
+		ReadTimeout:       time.Duration(5) * time.Second,
+		WriteTimeout:      time.Duration(5) * time.Second,
+		IdleTimeout:       time.Duration(5) * time.Second,
 	}
 
 	chErrors := make(chan error)
@@ -118,10 +144,12 @@ func AddServer() {
 		if err != nil {
 			log.Fatal("<-stop", err)
 		}
+		s.DBconn.Close()
 	case <-chErrors:
 		err := server.Shutdown(context.Background())
 		if err != nil {
 			log.Fatal("<-chErrors", err)
 		}
+		s.DBconn.Close()
 	}
 }
