@@ -32,6 +32,8 @@ func TotalWriteOff(conn *pgxpool.Pool, tk string) (float64, error) {
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		log.Println("TotalWriteOff: select max: ", err)
 		return 0, errors.New("internal server error. Select total_write_off")
+	} else if errors.Is(err, pgx.ErrNoRows) {
+		return 0, nil
 	}
 	return totalWriteOff, nil
 }
@@ -60,6 +62,8 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 	} else {
 		AccrualURL = accrualSA + "/"
 	}
+
+	log.Println(AccrualURL)
 
 	var orders []AccrualOrders
 	var balanceScore float64
