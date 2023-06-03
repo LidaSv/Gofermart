@@ -5,17 +5,16 @@ import (
 	"errors"
 	"flag"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/LidaSv/Gofermart.git/internal/handlers"
 	"github.com/caarlos0/env/v6"
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-
-	"github.com/LidaSv/Gofermart.git/internal/handlers"
 )
 
 type Configs struct {
@@ -23,16 +22,6 @@ type Configs struct {
 	AccrualSystemAddress string `env:"ACCRUAL_SYSTEM_ADDRESS" envDefault:"http://localhost:8080"`
 	DatabaseURI          string `env:"DATABASE_URI"`
 	//envDefault:"host=localhost port=6422 user=postgres password=123 dbname=postgres"
-}
-
-func ConnectDB(dbURL string) (*pgxpool.Pool, error) {
-	ctx := context.Background()
-
-	conn, err := pgxpool.New(ctx, dbURL)
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
 }
 
 func AddServer() {
@@ -50,6 +39,8 @@ func AddServer() {
 
 	var s handlers.Config
 	s.AccrualSA = *FlagAccrualSystemAddress
+
+	CreateTables(*FlagDatabaseURI)
 
 	r := chi.NewRouter()
 
@@ -76,8 +67,13 @@ func AddServer() {
 		ServerAdd = ServerAdd[:len(ServerAdd)-1]
 	}
 
+	listener, err := net.Listen("tcp", ServerAdd)
+	if err != nil {
+		log.Printf("Listen on address %s: %v", ServerAdd, err)
+		return
+	}
+
 	server := http.Server{
-		Addr:              ServerAdd,
 		Handler:           r,
 		ReadHeaderTimeout: time.Second,
 		ReadTimeout:       time.Duration(5) * time.Second,
@@ -88,58 +84,11 @@ func AddServer() {
 	chErrors := make(chan error)
 
 	go func() {
-		err := server.ListenAndServe()
+		err := server.Serve(listener)
 		if !errors.Is(err, http.ErrServerClosed) {
 			chErrors <- err
 		}
 	}()
-
-	db, err := ConnectDB(*FlagDatabaseURI)
-	if err != nil {
-		log.Println("Failed to connect to the database:", err)
-		return
-	}
-	defer db.Close()
-
-	s.DBconn = db
-
-	ctx := context.Background()
-
-	_, err = db.Exec(ctx,
-		`create table if not exists users (
-			id      	bigint primary key generated always as identity,
-			login   	text not null unique,
-			password 	text not null
-			)`)
-	if err != nil {
-		log.Println("Failed to create users table:", err)
-		return
-	}
-
-	_, err = db.Exec(ctx,
-		`create table if not exists orders (
-			user_token 	text not null,
-			id_order 	text not null unique,
-			event_time 	timestamptz not null
-			)`)
-	if err != nil {
-		log.Println("Failed to create orders table:", err)
-		return
-	}
-
-	_, err = db.Exec(ctx,
-		`create table if not exists balance (
-			user_token 			text not null,
-			id_order 			text not null unique,
-			processed_at 		timestamptz not null,
-    		total_balance_score	numeric(14,2),
-			order_balance_score float64,
-			total_write_off 	float64
-			)`)
-	if err != nil {
-		log.Println("Failed to create balance table:", err)
-		return
-	}
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
