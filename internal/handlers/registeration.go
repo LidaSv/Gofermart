@@ -6,7 +6,9 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"log"
 	"net/http"
 	"net/url"
 	"time"
@@ -37,10 +39,12 @@ func (c *Config) UsersRegister(w http.ResponseWriter, r *http.Request) {
 		case user.Login == "":
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("Invalid request format. Need to enter login"))
+			log.Println("UsersRegister: Invalid request format. Need to enter login")
 			return
 		case user.Password == "":
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("Invalid request format. Need to enter password"))
+			log.Println("UsersRegister: Invalid request format. Need to enter password")
 			return
 		}
 	}
@@ -51,10 +55,12 @@ func (c *Config) UsersRegister(w http.ResponseWriter, r *http.Request) {
 		user.Login).Scan(&count)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Println("UsersRegister: select count(*) from users: ", err)
 		return
 	}
 	if count > 0 {
 		http.Error(w, "Login already taken", http.StatusConflict)
+		log.Println("UsersRegister: Login already taken")
 		return
 	}
 
@@ -66,15 +72,15 @@ func (c *Config) UsersRegister(w http.ResponseWriter, r *http.Request) {
 		user.Login, hashedPass)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Println("UsersRegister: insert into users (login, password): ", err)
 		return
 	}
 
 	time64 := time.Now().Unix()
-	timeInt := string(time64)
+	timeInt := fmt.Sprint(time64)
 	token := user.Login + user.Password + timeInt
 	hashToken := md5.Sum([]byte(token))
 	hashedToken := hex.EncodeToString(hashToken[:])
-	//a.cache[hashedToken] = user
 	livingTime := 60 * time.Minute
 	expiration := time.Now().Add(livingTime)
 	cookie := http.Cookie{Name: "token", Value: url.QueryEscape(hashedToken), Expires: expiration}
@@ -94,10 +100,12 @@ func (c *Config) UsersLogin(w http.ResponseWriter, r *http.Request) {
 		case user.Login == "":
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("Invalid request format. Need to enter login"))
+			log.Println("UsersLogin: Need to enter login")
 			return
 		case user.Password == "":
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("Invalid request format. Need to enter password"))
+			log.Println("UsersLogin: Need to enter password")
 			return
 		}
 	}
@@ -113,19 +121,20 @@ func (c *Config) UsersLogin(w http.ResponseWriter, r *http.Request) {
 		user.Login, hashedPass).Scan(&count)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Println("UsersLogin: select count(*) from users: ", err)
 		return
 	}
 	if count == 0 {
 		http.Error(w, "Invalid login or password", http.StatusUnauthorized)
+		log.Println("UsersLogin: cnt = 0")
 		return
 	}
 
 	time64 := time.Now().Unix()
-	timeInt := string(time64)
+	timeInt := fmt.Sprint(time64)
 	token := user.Login + user.Password + timeInt
 	hashToken := md5.Sum([]byte(token))
 	hashedToken := hex.EncodeToString(hashToken[:])
-	//a.cache[hashedToken] = user
 	livingTime := 60 * time.Minute
 	expiration := time.Now().Add(livingTime)
 	cookie := http.Cookie{Name: "token", Value: url.QueryEscape(hashedToken), Expires: expiration}
@@ -135,31 +144,3 @@ func (c *Config) UsersLogin(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("User successfully authenticated"))
 
 }
-
-//func (a app) authorized(next http.Handler) http.Handler {
-//	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-//		token, err := readCookie("token", r)
-//		if err != nil {
-//			http.Redirect(w, r, "/login", http.StatusSeeOther)
-//			return
-//		}
-//		if _, ok := a.cache[token]; !ok {
-//			http.Redirect(w, r, "/login", http.StatusSeeOther)
-//			return
-//		}
-//		next.ServeHTTP(w, r)
-//	})
-//}
-
-//func readCookie(name string, r *http.Request) (value string, err error) {
-//	if name == "" {
-//		return value, errors.New("you are trying to read empty cookie")
-//	}
-//	cookie, err := r.Cookie(name)
-//	if err != nil {
-//		return value, err
-//	}
-//	str := cookie.Value
-//	value, _ = url.QueryUnescape(str)
-//	return value, err
-//}

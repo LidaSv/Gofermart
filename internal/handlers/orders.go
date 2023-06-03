@@ -16,6 +16,7 @@ func (c *Config) UsersOrdersDown(w http.ResponseWriter, r *http.Request) {
 	tk, err := r.Cookie("token")
 	if err != nil {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		log.Println("UsersOrdersDown: User not authenticated: ", err)
 		return
 	}
 
@@ -23,16 +24,19 @@ func (c *Config) UsersOrdersDown(w http.ResponseWriter, r *http.Request) {
 	err = json.NewDecoder(r.Body).Decode(&idOrder)
 	if err != nil {
 		http.Error(w, "Invalid request format", http.StatusBadRequest)
+		log.Println("UsersOrdersDown: Invalid request format: ", err)
 		return
 	}
 	if idOrder == 0 {
 		http.Error(w, "Invalid order format", http.StatusBadRequest)
+		log.Println("UsersOrdersDown: Invalid order format")
 		return
 	}
 
 	checkNumber := repository.CalculateLuhn(idOrder / 10)
 	if checkNumber != idOrder%10 {
 		http.Error(w, "Invalid order number", http.StatusUnprocessableEntity)
+		log.Println("UsersOrdersDown: Invalid order number")
 		return
 	}
 
@@ -44,7 +48,7 @@ func (c *Config) UsersOrdersDown(w http.ResponseWriter, r *http.Request) {
 		tk.Value, strconv.Itoa(idOrder)).Scan(&typeOrder)
 	if err != nil && err != pgx.ErrNoRows {
 		http.Error(w, "Internal server error. Select case", http.StatusInternalServerError)
-		log.Print(err)
+		log.Println("UsersOrdersDown: Select case: ", err)
 		return
 	}
 
@@ -64,7 +68,7 @@ func (c *Config) UsersOrdersDown(w http.ResponseWriter, r *http.Request) {
 			tk.Value, strconv.Itoa(idOrder))
 		if err != nil {
 			http.Error(w, "Internal server error. Insert into orders", http.StatusInternalServerError)
-			log.Print(err)
+			log.Println("UsersOrdersDown: Insert into orders: ", err)
 			return
 		}
 		w.WriteHeader(http.StatusAccepted)
@@ -77,20 +81,22 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 	tk, err := r.Cookie("token")
 	if err != nil {
 		http.Error(w, "User not authenticated", http.StatusUnauthorized)
+		log.Println("UsersOrdersGet: User not authenticated: ", err)
 		return
 	}
 
-	newErr, status, orders, _ := repository.LoadedOrderNumbers(c.DBconn, c.AccrualSA, tk.Value)
+	status, orders, _, newErr := repository.LoadedOrderNumbers(c.DBconn, c.AccrualSA, tk.Value)
 	if newErr != nil {
 		w.WriteHeader(status)
 		fmt.Fprint(w, newErr)
-		log.Println(newErr)
+		log.Println("UsersOrdersGet: newErr: ", newErr)
 		return
 	}
 
 	ordersMarshal, err := json.MarshalIndent(orders, "", "  ")
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		log.Println("UsersOrdersGet: json.MarshalIndent: ", err)
 		return
 	}
 

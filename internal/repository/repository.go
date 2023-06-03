@@ -22,23 +22,21 @@ type AccrualOrders struct {
 	UploadedAtTime time.Time `json:"-"`
 }
 
-func TotalWriteOff(conn *pgxpool.Pool, tk string) (error, float64) {
+func TotalWriteOff(conn *pgxpool.Pool, tk string) (float64, error) {
 	var totalWriteOff float64
 	err := conn.QueryRow(context.Background(),
-		`select total_write_off
+		`select max(total_write_off)
 			from balance 
-			where processed_at = (select max(processed_at) 
-			                      from balance 
-			                      where user_token = $1)`,
+			where user_token = $1`,
 		tk).Scan(&totalWriteOff)
 	if err != nil && err != pgx.ErrNoRows {
-		log.Print(err)
-		return errors.New("Internal server error. Select total_write_off"), 0
+		log.Println("TotalWriteOff: select max: ", err)
+		return 0, errors.New("internal server error. Select total_write_off")
 	}
-	return nil, totalWriteOff
+	return totalWriteOff, nil
 }
 
-func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (error, int, []AccrualOrders, float64) {
+func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []AccrualOrders, float64, error) {
 	rows, err := conn.Query(context.Background(),
 		`select id_order, event_time
 			from orders
@@ -46,11 +44,13 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (error, int, [
 			order by event_time desc`,
 		tk)
 	if err != nil && err != pgx.ErrNoRows {
-		return errors.New(`Internal server error. Select id_order, event_time`),
-			http.StatusInternalServerError, nil, 0
+		log.Println("LoadedOrderNumbers: select id_order, event_time: ", err)
+		return http.StatusInternalServerError, nil, 0,
+			errors.New(`internal server error. Select id_order, event_time`)
 	}
 	if err == pgx.ErrNoRows {
-		return errors.New("No data to answer"), http.StatusNoContent, nil, 0
+		log.Println("LoadedOrderNumbers: pgx.ErrNoRows")
+		return http.StatusNoContent, nil, 0, errors.New("no data to answer")
 	}
 	defer rows.Close()
 
@@ -67,22 +67,23 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (error, int, [
 		var accrual, accrualDecode AccrualOrders
 		err := rows.Scan(&accrual.NumberOrder, &accrual.UploadedAtTime)
 		if err != nil {
-			log.Println(err)
-			return errors.New("Internal server error. Scan AccrualOrders"),
-				http.StatusInternalServerError, nil, 0
+			log.Println("LoadedOrderNumbers: scan rows: ", err)
+			return http.StatusInternalServerError, nil, 0,
+				errors.New("internal server error. Scan AccrualOrders")
 		}
 
 		res, err := http.Get(AccrualURL + accrual.NumberOrder)
 		if err != nil {
-			log.Print("Internal server error. Get /api/orders/{number}")
-			return errors.New("Internal server error. Get /api/orders/number"),
-				http.StatusInternalServerError, nil, 0
+			log.Println("LoadedOrderNumbers: Get /api/orders/{number}: ", err)
+			return http.StatusInternalServerError, nil, 0,
+				errors.New("internal server error. Get /api/orders/number")
 		}
+		defer res.Body.Close()
 		err = json.NewDecoder(res.Body).Decode(&accrualDecode)
 		if err != nil && err != io.EOF {
-			log.Println(err)
-			return errors.New("Internal server error. NewDecoder"),
-				http.StatusInternalServerError, nil, 0
+			log.Println("LoadedOrderNumbers: NewDecoder: ", err)
+			return http.StatusInternalServerError, nil, 0,
+				errors.New("internal server error. NewDecoder")
 		}
 
 		if err != io.EOF {
@@ -100,8 +101,9 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (error, int, [
 	}
 
 	if orders == nil {
-		return errors.New("No data to answer"), http.StatusNoContent, nil, 0
+		log.Println("LoadedOrderNumbers: no data to answer: ", err)
+		return http.StatusNoContent, nil, 0, errors.New("no data to answer")
 	}
 
-	return nil, http.StatusOK, orders, balanceScore
+	return http.StatusOK, orders, balanceScore, nil
 }

@@ -29,14 +29,14 @@ func ConnectDB(dbURL *string) (*pgxpool.Pool, error) {
 
 func AddServer() {
 
-	FlagServerAddress := flag.String("a", "localhost:8080", "a string")
+	FlagServerAddress := flag.String("a", "localhost:8090", "a string")
 	AccrualSystemAddress := flag.String("f", "FlagServerAddress", "a string")
 	FlagDatabaseDsn := flag.String("d", "host=localhost port=6422 user=postgres password=123 dbname=postgres", "a string")
 	flag.Parse()
 
 	db, err := ConnectDB(FlagDatabaseDsn)
 	if err != nil {
-		log.Fatal("Failed to connect to the database:", err)
+		log.Println("Failed to connect to the database:", err)
 		return
 	}
 	defer db.Close()
@@ -53,7 +53,8 @@ func AddServer() {
 			password 	text not null
 			)`)
 	if err != nil {
-		log.Fatal("Failed to create users table:", err)
+		log.Println("Failed to create users table:", err)
+		return
 	}
 
 	_, err = db.Exec(ctx,
@@ -63,7 +64,8 @@ func AddServer() {
 			event_time 	timestamptz not null
 			)`)
 	if err != nil {
-		log.Fatal("Failed to create orders table:", err)
+		log.Println("Failed to create orders table:", err)
+		return
 	}
 
 	_, err = db.Exec(ctx,
@@ -76,7 +78,8 @@ func AddServer() {
 			total_write_off 	float64
 			)`)
 	if err != nil {
-		log.Fatal("Failed to create balance table:", err)
+		log.Println("Failed to create balance table:", err)
+		return
 	}
 
 	r := chi.NewRouter()
@@ -92,9 +95,8 @@ func AddServer() {
 	})
 
 	server := &http.Server{
-		Addr:              *FlagServerAddress,
-		Handler:           r,
-		ReadHeaderTimeout: 5 * time.Second,
+		Addr:    *FlagServerAddress,
+		Handler: r,
 	}
 
 	chErrors := make(chan error)
@@ -114,12 +116,12 @@ func AddServer() {
 		signal.Stop(stop)
 		err := server.Shutdown(context.Background())
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal("<-stop", err)
 		}
 	case <-chErrors:
 		err := server.Shutdown(context.Background())
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal("<-chErrors", err)
 		}
 	}
 }
