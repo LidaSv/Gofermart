@@ -18,8 +18,8 @@ import (
 )
 
 type Configs struct {
-	RunAddress           string `env:"RUN_ADDRESS"`
-	AccrualSystemAddress string `env:"ACCRUAL_SYSTEM_ADDRESS"`
+	RunAddress           string `env:"RUN_ADDRESS" envDefault:"localhost:8080"`
+	AccrualSystemAddress string `env:"ACCRUAL_SYSTEM_ADDRESS" envDefault:"http://localhost:8080"`
 	DatabaseURI          string `env:"DATABASE_URI"`
 	//envDefault:"host=localhost port=6422 user=postgres password=123 dbname=postgres"
 }
@@ -42,21 +42,13 @@ func AddServer() {
 		log.Fatal(err)
 	}
 
-	FlagServerAddress := flag.String("a", cfg.RunAddress, "a string")
-	AccrualSystemAddress := flag.String("r", cfg.AccrualSystemAddress, "a string")
-	FlagDatabaseDsn := flag.String("d", cfg.DatabaseURI, "a string")
+	FlagRunAddress := flag.String("a", cfg.RunAddress, "a string")
+	FlagAccrualSystemAddress := flag.String("r", cfg.AccrualSystemAddress, "a string")
+	FlagDatabaseURI := flag.String("d", cfg.DatabaseURI, "a string")
 	flag.Parse()
 
-	db, err := ConnectDB(*FlagDatabaseDsn)
-	if err != nil {
-		log.Println("Failed to connect to the database:", err)
-		return
-	}
-	defer db.Close()
-
 	var s handlers.Config
-	s.DBconn = db
-	s.AccrualSA = *AccrualSystemAddress
+	s.AccrualSA = *FlagAccrualSystemAddress
 
 	r := chi.NewRouter()
 
@@ -76,7 +68,7 @@ func AddServer() {
 	if serverExists {
 		ServerAdd = serverPath
 	} else {
-		ServerAdd = *FlagServerAddress
+		ServerAdd = *FlagRunAddress
 	}
 
 	if ServerAdd[len(ServerAdd)-1:] == "/" {
@@ -100,6 +92,15 @@ func AddServer() {
 			chErrors <- err
 		}
 	}()
+
+	db, err := ConnectDB(*FlagDatabaseURI)
+	if err != nil {
+		log.Println("Failed to connect to the database:", err)
+		return
+	}
+	defer db.Close()
+
+	s.DBconn = db
 
 	ctx := context.Background()
 
