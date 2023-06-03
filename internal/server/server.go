@@ -25,8 +25,7 @@ type Configs struct {
 }
 
 func ConnectDB(dbURL string) (*pgxpool.Pool, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	ctx := context.Background()
 
 	conn, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
@@ -58,6 +57,49 @@ func AddServer() {
 	var s handlers.Config
 	s.DBconn = db
 	s.AccrualSA = *AccrualSystemAddress
+
+	r := chi.NewRouter()
+
+	r.Route("/api/user", func(r chi.Router) {
+		r.Post("/register", s.UsersRegister)
+		r.Post("/login", s.UsersLogin)
+		r.Post("/orders", s.UsersOrdersDown)
+		r.Get("/orders", s.UsersOrdersGet)
+		r.Get("/balance", s.UsersBalance)
+		r.Post("/balance/withdraw", s.UsersBalanceWithdraw)
+		r.Get("/withdrawals", s.UsersWithdrawals)
+	})
+
+	serverPath, serverExists := os.LookupEnv("RUN_ADDRESS")
+
+	var ServerAdd string
+	if serverExists {
+		ServerAdd = serverPath
+	} else {
+		ServerAdd = *FlagServerAddress
+	}
+
+	if ServerAdd[len(ServerAdd)-1:] == "/" {
+		ServerAdd = ServerAdd[:len(ServerAdd)-1]
+	}
+
+	server := &http.Server{
+		Addr:              ServerAdd,
+		Handler:           r,
+		ReadHeaderTimeout: time.Second,
+		ReadTimeout:       time.Duration(5) * time.Second,
+		WriteTimeout:      time.Duration(5) * time.Second,
+		IdleTimeout:       time.Duration(5) * time.Second,
+	}
+
+	chErrors := make(chan error)
+
+	go func() {
+		err := server.ListenAndServe()
+		if !errors.Is(err, http.ErrServerClosed) {
+			chErrors <- err
+		}
+	}()
 
 	ctx := context.Background()
 	_, err = db.Exec(ctx,
@@ -95,42 +137,6 @@ func AddServer() {
 		log.Println("Failed to create balance table:", err)
 		return
 	}
-
-	r := chi.NewRouter()
-
-	r.Route("/api/user", func(r chi.Router) {
-		r.Post("/register", s.UsersRegister)
-		r.Post("/login", s.UsersLogin)
-		r.Post("/orders", s.UsersOrdersDown)
-		r.Get("/orders", s.UsersOrdersGet)
-		r.Get("/balance", s.UsersBalance)
-		r.Post("/balance/withdraw", s.UsersBalanceWithdraw)
-		r.Get("/withdrawals", s.UsersWithdrawals)
-	})
-
-	ServerAdd := *FlagServerAddress
-
-	if ServerAdd[len(ServerAdd)-1:] == "/" {
-		ServerAdd = ServerAdd[:len(ServerAdd)-1]
-	}
-
-	server := &http.Server{
-		Addr:              ServerAdd,
-		Handler:           r,
-		ReadHeaderTimeout: time.Second,
-		ReadTimeout:       time.Duration(5) * time.Second,
-		WriteTimeout:      time.Duration(5) * time.Second,
-		IdleTimeout:       time.Duration(5) * time.Second,
-	}
-
-	chErrors := make(chan error)
-
-	go func() {
-		err := server.ListenAndServe()
-		if !errors.Is(err, http.ErrServerClosed) {
-			chErrors <- err
-		}
-	}()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
