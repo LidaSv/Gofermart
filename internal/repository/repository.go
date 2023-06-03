@@ -29,7 +29,7 @@ func TotalWriteOff(conn *pgxpool.Pool, tk string) (float64, error) {
 			from balance 
 			where user_token = $1`,
 		tk).Scan(&totalWriteOff)
-	if err != nil && err != pgx.ErrNoRows {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		log.Println("TotalWriteOff: select max: ", err)
 		return 0, errors.New("internal server error. Select total_write_off")
 	}
@@ -43,12 +43,12 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 			where user_token = $1
 			order by event_time desc`,
 		tk)
-	if err != nil && err != pgx.ErrNoRows {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		log.Println("LoadedOrderNumbers: select id_order, event_time: ", err)
 		return http.StatusInternalServerError, nil, 0,
 			errors.New(`internal server error. Select id_order, event_time`)
 	}
-	if err == pgx.ErrNoRows {
+	if errors.Is(err, pgx.ErrNoRows) {
 		log.Println("LoadedOrderNumbers: pgx.ErrNoRows")
 		return http.StatusNoContent, nil, 0, errors.New("no data to answer")
 	}
@@ -80,13 +80,13 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 		}
 		defer res.Body.Close()
 		err = json.NewDecoder(res.Body).Decode(&accrualDecode)
-		if err != nil && err != io.EOF {
+		if err != nil && !errors.Is(io.EOF, err) {
 			log.Println("LoadedOrderNumbers: NewDecoder: ", err)
 			return http.StatusInternalServerError, nil, 0,
 				errors.New("internal server error. NewDecoder")
 		}
 
-		if err != io.EOF {
+		if errors.Is(io.EOF, err) {
 			accrual.UploadedAt = accrual.UploadedAtTime.Format(time.RFC3339)
 			if accrualDecode.Status == "REGISTERED" {
 				accrual.Status = "NEW"

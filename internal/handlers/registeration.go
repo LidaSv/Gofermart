@@ -6,7 +6,9 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"log"
 	"net/http"
@@ -30,7 +32,7 @@ type User struct {
 }
 
 func (c *Config) UsersRegister(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set(typeContentType, bodyContentTypeJSON)
+	//w.Header().Set(typeContentType, bodyContentTypeJSON)
 
 	var user User
 	err := json.NewDecoder(r.Body).Decode(&user)
@@ -38,12 +40,12 @@ func (c *Config) UsersRegister(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case user.Login == "":
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("Invalid request format. Need to enter login"))
+			//w.Write([]byte("Invalid request format. Need to enter login"))
 			log.Println("UsersRegister: Invalid request format. Need to enter login")
 			return
 		case user.Password == "":
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("Invalid request format. Need to enter password"))
+			//w.Write([]byte("Invalid request format. Need to enter password"))
 			log.Println("UsersRegister: Invalid request format. Need to enter password")
 			return
 		}
@@ -53,13 +55,15 @@ func (c *Config) UsersRegister(w http.ResponseWriter, r *http.Request) {
 	err = c.DBconn.QueryRow(context.Background(),
 		`select count(*) from users where login = $1`,
 		user.Login).Scan(&count)
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		//http.Error(w, "Internal server error", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		log.Println("UsersRegister: select count(*) from users: ", err)
 		return
 	}
 	if count > 0 {
-		http.Error(w, "Login already taken", http.StatusConflict)
+		//http.Error(w, "Login already taken", http.StatusConflict)
+		w.WriteHeader(http.StatusConflict)
 		log.Println("UsersRegister: Login already taken")
 		return
 	}
@@ -71,19 +75,13 @@ func (c *Config) UsersRegister(w http.ResponseWriter, r *http.Request) {
 		`insert into users (login, password) values ($1, $2)`,
 		user.Login, hashedPass)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		//http.Error(w, "Internal server error", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
 		log.Println("UsersRegister: insert into users (login, password): ", err)
 		return
 	}
 
-	time64 := time.Now().Unix()
-	timeInt := fmt.Sprint(time64)
-	token := user.Login + user.Password + timeInt
-	hashToken := md5.Sum([]byte(token))
-	hashedToken := hex.EncodeToString(hashToken[:])
-	livingTime := 60 * time.Minute
-	expiration := time.Now().Add(livingTime)
-	cookie := http.Cookie{Name: "token", Value: url.QueryEscape(hashedToken), Expires: expiration}
+	cookie := SetCookie(user.Login, user.Password)
 	http.SetCookie(w, &cookie)
 
 	w.WriteHeader(http.StatusOK)
@@ -119,28 +117,33 @@ func (c *Config) UsersLogin(w http.ResponseWriter, r *http.Request) {
 			from users 
 			where login = $1 and password = $2`,
 		user.Login, hashedPass).Scan(&count)
-	if err != nil {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		log.Println("UsersLogin: select count(*) from users: ", err)
 		return
 	}
-	if count == 0 {
+	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "Invalid login or password", http.StatusUnauthorized)
 		log.Println("UsersLogin: cnt = 0")
 		return
 	}
 
-	time64 := time.Now().Unix()
-	timeInt := fmt.Sprint(time64)
-	token := user.Login + user.Password + timeInt
-	hashToken := md5.Sum([]byte(token))
-	hashedToken := hex.EncodeToString(hashToken[:])
-	livingTime := 60 * time.Minute
-	expiration := time.Now().Add(livingTime)
-	cookie := http.Cookie{Name: "token", Value: url.QueryEscape(hashedToken), Expires: expiration}
+	cookie := SetCookie(user.Login, user.Password)
 	http.SetCookie(w, &cookie)
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("User successfully authenticated"))
 
+}
+
+func SetCookie(login, password string) http.Cookie {
+	time64 := time.Now().Unix()
+	timeInt := fmt.Sprint(time64)
+	token := login + password + timeInt
+	hashToken := md5.Sum([]byte(token))
+	hashedToken := hex.EncodeToString(hashToken[:])
+	livingTime := 60 * time.Minute
+	expiration := time.Now().Add(livingTime)
+	cookie := http.Cookie{Name: "token", Value: url.QueryEscape(hashedToken), Expires: expiration}
+	return cookie
 }

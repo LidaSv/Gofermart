@@ -21,15 +21,15 @@ import (
 type Configs struct {
 	RunAddress           string `env:"RUN_ADDRESS" envDefault:"localhost:8080"`
 	AccrualSystemAddress string `env:"ACCRUAL_SYSTEM_ADDRESS"`
-	DatabaseUri          string `env:"DATABASE_URI"`
+	DatabaseURI          string `env:"DATABASE_URI"`
 	//envDefault:"host=localhost port=6422 user=postgres password=123 dbname=postgres"
 }
 
-func ConnectDB(dbURL *string) (*pgxpool.Pool, error) {
+func ConnectDB(dbURL string) (*pgxpool.Pool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	conn, err := pgxpool.New(ctx, *dbURL)
+	conn, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
 		return nil, err
 	}
@@ -46,10 +46,10 @@ func AddServer() {
 
 	FlagServerAddress := flag.String("a", cfg.RunAddress, "a string")
 	AccrualSystemAddress := flag.String("r", cfg.RunAddress, "a string")
-	FlagDatabaseDsn := flag.String("d", cfg.DatabaseUri, "a string")
+	FlagDatabaseDsn := flag.String("d", cfg.DatabaseURI, "a string")
 	flag.Parse()
 
-	db, err := ConnectDB(FlagDatabaseDsn)
+	db, err := ConnectDB(*FlagDatabaseDsn)
 	if err != nil {
 		log.Println("Failed to connect to the database:", err)
 		return

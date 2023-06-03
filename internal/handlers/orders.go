@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/LidaSv/Gofermart.git/internal/repository"
 	"github.com/jackc/pgx/v5"
@@ -46,7 +47,7 @@ func (c *Config) UsersOrdersDown(w http.ResponseWriter, r *http.Request) {
 			from orders 
 			where id_order = $2`,
 		tk.Value, strconv.Itoa(idOrder)).Scan(&typeOrder)
-	if err != nil && err != pgx.ErrNoRows {
+	if err != nil && errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "Internal server error. Select case", http.StatusInternalServerError)
 		log.Println("UsersOrdersDown: Select case: ", err)
 		return

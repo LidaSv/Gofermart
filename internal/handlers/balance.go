@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/LidaSv/Gofermart.git/internal/repository"
 	"github.com/jackc/pgx/v5"
@@ -154,12 +155,12 @@ func (c *Config) UsersWithdrawals(w http.ResponseWriter, r *http.Request) {
 			where user_token = $1
 			order by 3 desc`,
 		tk.Value)
-	if err != nil && err != pgx.ErrNoRows {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, `Internal server error. Select id_order, event_time`, http.StatusInternalServerError)
 		log.Println("UsersWithdrawals: User not authenticated: Select id_order, event_time: ", err)
 		return
 	}
-	if err == pgx.ErrNoRows {
+	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "No data to answer", http.StatusNoContent)
 		log.Println("UsersWithdrawals: No data to answer")
 		return
