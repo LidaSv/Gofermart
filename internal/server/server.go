@@ -18,8 +18,8 @@ import (
 )
 
 type Configs struct {
-	RunAddress           string `env:"RUN_ADDRESS" envDefault:"http://localhost:8080"`
-	AccrualSystemAddress string `env:"ACCRUAL_SYSTEM_ADDRESS" envDefault:"http://localhost:8080"`
+	RunAddress           string `env:"RUN_ADDRESS"`
+	AccrualSystemAddress string `env:"ACCRUAL_SYSTEM_ADDRESS"`
 	DatabaseURI          string `env:"DATABASE_URI"`
 	//envDefault:"host=localhost port=6422 user=postgres password=123 dbname=postgres"
 }
@@ -83,7 +83,7 @@ func AddServer() {
 		ServerAdd = ServerAdd[:len(ServerAdd)-1]
 	}
 
-	server := &http.Server{
+	server := http.Server{
 		Addr:              ServerAdd,
 		Handler:           r,
 		ReadHeaderTimeout: time.Second,
@@ -102,6 +102,7 @@ func AddServer() {
 	}()
 
 	ctx := context.Background()
+
 	_, err = db.Exec(ctx,
 		`create table if not exists users (
 			id      	bigint primary key generated always as identity,
