@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"github.com/LidaSv/Gofermart.git/internal/handlers"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"log"
 )
@@ -12,22 +11,20 @@ func ConnectDB(dbURL string) (*pgxpool.Pool, error) {
 
 	conn, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
+		log.Println("Bad connection")
 		return nil, err
 	}
 	return conn, nil
 }
 
-func CreateTables(FlagDatabaseURI string) {
+func CreateTables(FlagDatabaseURI string) (*pgxpool.Pool, error) {
 
 	db, err := ConnectDB(FlagDatabaseURI)
 	if err != nil {
 		log.Println("Failed to connect to the database:", err)
-		return
+		return nil, err
 	}
 	defer db.Close()
-
-	var s handlers.Config
-	s.DBconn = db
 
 	ctx := context.Background()
 
@@ -39,7 +36,7 @@ func CreateTables(FlagDatabaseURI string) {
 			)`)
 	if err != nil {
 		log.Println("Failed to create users table:", err)
-		return
+		return nil, err
 	}
 
 	_, err = db.Exec(ctx,
@@ -50,7 +47,7 @@ func CreateTables(FlagDatabaseURI string) {
 			)`)
 	if err != nil {
 		log.Println("Failed to create orders table:", err)
-		return
+		return nil, err
 	}
 
 	_, err = db.Exec(ctx,
@@ -64,6 +61,8 @@ func CreateTables(FlagDatabaseURI string) {
 			)`)
 	if err != nil {
 		log.Println("Failed to create balance table:", err)
-		return
+		return nil, err
 	}
+
+	return db, nil
 }
