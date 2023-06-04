@@ -9,7 +9,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -18,7 +17,7 @@ type AccrualOrders struct {
 	Order          string    `json:"order,omitempty"`
 	NumberOrder    string    `json:"number"`
 	Status         string    `json:"status"`
-	Accrual        string    `json:"accrual,omitempty"`
+	Accrual        int       `json:"accrual,omitempty"`
 	UploadedAt     string    `json:"uploaded_at"`
 	UploadedAtTime time.Time `json:"-"`
 }
@@ -99,12 +98,12 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 				accrual.Status = accrualDecode.Status
 			}
 
-			num, err := strconv.ParseFloat(accrualDecode.Accrual, 64)
-			if err != nil {
-				return http.StatusInternalServerError, nil, 0,
-					errors.New("internal server error. strconv.ParseFloat")
-			}
-			balanceScore += num
+			//num, err := strconv.ParseFloat(accrualDecode.Accrual, 64)
+			//if err != nil {
+			//	return http.StatusInternalServerError, nil, 0,
+			//		errors.New("internal server error. strconv.ParseFloat")
+			//}
+			balanceScore += float64(accrualDecode.Accrual)
 			accrual.Accrual = accrualDecode.Accrual
 			accrual.Order = ""
 			orders = append(orders, accrual)
