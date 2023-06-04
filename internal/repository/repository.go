@@ -118,13 +118,6 @@ func GetHTTP(AccrualURL string, accrualDecode DecodeAccrualOrders, accrual Accru
 	if res.StatusCode == http.StatusTooManyRequests {
 		time.Sleep(3 * time.Second)
 		GetHTTP(AccrualURL, accrualDecode, accrual, balanceScore)
-		//header := res.Header
-		//a := header["Retry-After"][0]
-		//sec, err := strconv.ParseInt(a, 10, 0)
-		//if err != nil {
-		//	return http.StatusTooManyRequests, accrual, balanceScore, errors.New("status 409 err")
-		//}
-		//return http.StatusTooManyRequests, accrual, balanceScore, errors.New("status 409")
 	}
 
 	if !errors.Is(io.EOF, err) {
@@ -155,21 +148,3 @@ func GetHTTP(AccrualURL string, accrualDecode DecodeAccrualOrders, accrual Accru
 	}
 	return 0, accrual, balanceScore, nil
 }
-
-//func (s *serverMart) worker(order string, login string, wg, wgTimer *sync.WaitGroup) {
-//	wgTimer.Wait()
-//	accrual, sec, err := events.AccrualGet(s.Cfg.AccrualAddress, order)
-//	for sec != 0 {
-//		wgTimer.Add(1)
-//
-//		wgTimer.Done()
-//		accrual, sec, err = events.AccrualGet(s.Cfg.AccrualAddress, order)
-//	}
-//	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-//	defer cancel()
-//	if err != nil {
-//		return
-//	}
-//	_ = s.DB.UpdateOrderAccrual(ctx, login, accrual)
-//	wg.Done()
-//}

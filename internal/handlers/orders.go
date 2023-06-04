@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -87,11 +88,28 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	status, orders, _, newErr := repository.LoadedOrderNumbers(c.DBconn, c.AccrualSA, tk.Value)
-	if newErr != nil {
+	if newErr != nil && newErr != errors.New("no data to answer in res.StatusCode") {
 		w.WriteHeader(status)
 		fmt.Fprint(w, newErr)
 		log.Println("UsersOrdersGet: newErr: ", newErr)
 		return
+	} else {
+		var totalWriteOff sql.NullInt32
+		err := c.DBconn.QueryRow(context.Background(),
+			`select count(*)
+			from orders 
+			where user_token = $1`,
+			tk.Value).Scan(&totalWriteOff)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			log.Println("TotalWriteOff: select max: ", err)
+			http.Error(w, "Internal server error. Select total_write_off", http.StatusInternalServerError)
+		} else if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "Internal server error. Select total_write_off", http.StatusNoContent)
+		}
+		if !totalWriteOff.Valid {
+			http.Error(w, "Internal server error. Select total_write_off", http.StatusNoContent)
+		}
+		w.WriteHeader(http.StatusOK)
 	}
 
 	ordersMarshal, err := json.MarshalIndent(orders, "", "  ")

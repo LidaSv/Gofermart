@@ -102,7 +102,7 @@ func (c *Config) UsersBalanceWithdraw(w http.ResponseWriter, r *http.Request) {
 		log.Println("UsersBalanceWithdraw: Invalid order number")
 		return
 	}
-	log.Println(tk.Value)
+
 	totalWriteOff, err := repository.TotalWriteOff(c.DBconn, tk.Value)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -128,7 +128,7 @@ func (c *Config) UsersBalanceWithdraw(w http.ResponseWriter, r *http.Request) {
 	_, err = c.DBconn.Exec(context.Background(),
 		`insert into balance (user_token, id_order, processed_at, 
                     total_balance_score, order_balance_score, total_write_off) 
-				values ($1, $2, now(), $4, $5, $6)`,
+				values ($1, $2, now(), $3, $4, $5)`,
 		tk.Value, req.Order, balanceScore-totalWriteOff, req.Score, totalWriteOff+req.Score)
 	if err != nil {
 		http.Error(w, "Internal server error. Insert into balance", http.StatusInternalServerError)
