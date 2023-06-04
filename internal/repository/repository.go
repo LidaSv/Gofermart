@@ -14,12 +14,12 @@ import (
 )
 
 type AccrualOrders struct {
-	Order          string    `json:"order,omitempty"`
-	NumberOrder    string    `json:"number"`
-	Status         string    `json:"status"`
-	Accrual        int       `json:"accrual,omitempty"`
-	UploadedAt     string    `json:"uploaded_at"`
-	UploadedAtTime time.Time `json:"-"`
+	Order          string      `json:"order,omitempty"`
+	NumberOrder    string      `json:"number"`
+	Status         string      `json:"status"`
+	Accrual        json.Number `json:"accrual,omitempty"`
+	UploadedAt     string      `json:"uploaded_at"`
+	UploadedAtTime time.Time   `json:"-"`
 }
 
 func TotalWriteOff(conn *pgxpool.Pool, tk string) (float64, error) {
@@ -98,12 +98,12 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 				accrual.Status = accrualDecode.Status
 			}
 
-			//num, err := strconv.ParseFloat(accrualDecode.Accrual, 64)
-			//if err != nil {
-			//	return http.StatusInternalServerError, nil, 0,
-			//		errors.New("internal server error. strconv.ParseFloat")
-			//}
-			balanceScore += float64(accrualDecode.Accrual)
+			num, err := accrualDecode.Accrual.Float64()
+			if err != nil {
+				return http.StatusInternalServerError, nil, 0,
+					errors.New("internal server error. strconv.ParseFloat")
+			}
+			balanceScore += num
 			accrual.Accrual = accrualDecode.Accrual
 			accrual.Order = ""
 			orders = append(orders, accrual)
