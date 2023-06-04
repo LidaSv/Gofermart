@@ -83,7 +83,7 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 		}
 
 		//AccrualURL+accrual.NumberOrder
-		status, accrual, balanceScore1, err := GetHTTP(AccrualURL, accrualDecode, accrual, balanceScore)
+		status, accrual, balanceScore1, err := GetHTTP(AccrualURL+accrual.NumberOrder, accrualDecode, accrual, balanceScore)
 		if err != nil {
 			log.Println("LoadedOrderNumbers: Get /api/orders/{number}: ", err)
 			return status, nil, 0, err
@@ -115,6 +115,7 @@ func GetHTTP(AccrualURL string, accrualDecode DecodeAccrualOrders, accrual Accru
 	if res.StatusCode == http.StatusTooManyRequests {
 		time.Sleep(3 * time.Second)
 		GetHTTP(AccrualURL, accrualDecode, accrual, balanceScore)
+
 	}
 
 	respBody := fmt.Sprintf(`%s`, res.Body)
