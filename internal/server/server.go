@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"errors"
-	"flag"
 	"log"
 	"net"
 	"net/http"
@@ -32,18 +31,18 @@ func AddServer() {
 		log.Fatal(err)
 	}
 
-	FlagRunAddress := flag.String("a", cfg.RunAddress, "a string")
-	FlagAccrualSystemAddress := flag.String("r", cfg.AccrualSystemAddress, "a string")
-	FlagDatabaseURI := flag.String("d", cfg.DatabaseURI, "a string")
-	flag.Parse()
+	//FlagRunAddress := flag.String("a", cfg.RunAddress, "a string")
+	//FlagAccrualSystemAddress := flag.String("r", cfg.AccrualSystemAddress, "a string")
+	//FlagDatabaseURI := flag.String("d", cfg.DatabaseURI, "a string")
+	//flag.Parse()
 
-	db, err := CreateTables(*FlagDatabaseURI)
+	db, err := CreateTables(cfg.DatabaseURI)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	var s handlers.Config
-	s.AccrualSA = *FlagAccrualSystemAddress
+	s.AccrualSA = cfg.AccrualSystemAddress
 	s.DBconn = db
 
 	r := chi.NewRouter()
@@ -58,14 +57,7 @@ func AddServer() {
 		r.Get("/withdrawals", s.UsersWithdrawals)
 	})
 
-	serverPath, serverExists := os.LookupEnv("RUN_ADDRESS")
-
-	var ServerAdd string
-	if serverExists {
-		ServerAdd = serverPath
-	} else {
-		ServerAdd = *FlagRunAddress
-	}
+	ServerAdd := cfg.RunAddress
 
 	if ServerAdd[len(ServerAdd)-1:] == "/" {
 		ServerAdd = ServerAdd[:len(ServerAdd)-1]

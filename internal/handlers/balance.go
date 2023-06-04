@@ -102,7 +102,7 @@ func (c *Config) UsersBalanceWithdraw(w http.ResponseWriter, r *http.Request) {
 		log.Println("UsersBalanceWithdraw: Invalid order number")
 		return
 	}
-
+	log.Println(tk.Value)
 	totalWriteOff, err := repository.TotalWriteOff(c.DBconn, tk.Value)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
