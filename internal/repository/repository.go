@@ -10,7 +10,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -25,9 +24,9 @@ type AccrualOrders struct {
 }
 
 type DecodeAccrualOrders struct {
-	Order   interface{} `json:"order"`
-	Status  string      `json:"status"`
-	Accrual interface{} `json:"accrual,omitempty"`
+	Order   string  `json:"order"`
+	Status  string  `json:"status"`
+	Accrual float64 `json:"accrual"`
 }
 
 func TotalWriteOff(conn *pgxpool.Pool, tk string) (float64, error) {
@@ -66,9 +65,9 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 
 	var AccrualURL string
 	if strings.HasSuffix(accrualSA, "/") {
-		AccrualURL = accrualSA
+		AccrualURL = accrualSA + "api/orders/"
 	} else {
-		AccrualURL = accrualSA + "/"
+		AccrualURL = accrualSA + "/api/orders/"
 	}
 
 	var orders []AccrualOrders
@@ -83,7 +82,8 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 				errors.New("internal server error. Scan AccrualOrders")
 		}
 
-		status, accrual, balanceScore1, err := GetHTTP(AccrualURL+accrual.NumberOrder, accrualDecode, accrual, balanceScore)
+		//AccrualURL+accrual.NumberOrder
+		status, accrual, balanceScore1, err := GetHTTP(AccrualURL, accrualDecode, accrual, balanceScore)
 		if err != nil {
 			log.Println("LoadedOrderNumbers: Get /api/orders/{number}: ", err)
 			return status, nil, 0, err
@@ -117,21 +117,6 @@ func GetHTTP(AccrualURL string, accrualDecode DecodeAccrualOrders, accrual Accru
 		GetHTTP(AccrualURL, accrualDecode, accrual, balanceScore)
 	}
 
-	//dec := json.NewDecoder(res.Body)
-	//for {
-	//	t, err := dec.Token()
-	//	if err == io.EOF {
-	//		break
-	//	}
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
-	//	log.Printf("%T: %v", t, t)
-	//	if dec.More() {
-	//		log.Printf(" (more)")
-	//	}
-	//	log.Printf("\n")
-	//}
 	respBody := fmt.Sprintf(`%s`, res.Body)
 	log.Println(respBody)
 	if !errors.Is(io.EOF, err) {
@@ -157,29 +142,7 @@ func GetHTTP(AccrualURL string, accrualDecode DecodeAccrualOrders, accrual Accru
 			accrual.Status = accrualDecode.Status
 		}
 
-		if accrualDecode.Accrual != nil {
-			switch v := accrualDecode.Accrual.(type) {
-			case float64:
-				balanceScore += v
-				accrual.Accrual = v
-			case string:
-				accrualValue, err := strconv.ParseFloat(v, 64)
-				if err == nil {
-					balanceScore += accrualValue
-					accrual.Accrual = accrualValue
-				} else {
-					log.Println("Error converting string to float64: ", err)
-					return http.StatusInternalServerError, accrual, balanceScore, errors.New("error converting string to float64")
-				}
-			case int:
-				balanceScore += float64(v)
-				accrual.Accrual = float64(v)
-			default:
-				fmt.Println("Unsupported type for Accrual value")
-				return http.StatusInternalServerError, accrual, balanceScore, errors.New("unsupported type for Accrual value")
-			}
-		}
-
+		balanceScore += accrualDecode.Accrual
 		accrual.Order = ""
 	}
 	return 0, accrual, balanceScore, nil
