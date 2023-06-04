@@ -22,6 +22,33 @@ type AccrualOrders struct {
 	UploadedAtTime time.Time   `json:"-"`
 }
 
+type AccrualOrders1 struct {
+	Order          string      `json:"order,omitempty"`
+	NumberOrder    string      `json:"number"`
+	Status         string      `json:"status"`
+	Accrual        json.Number `json:"accrual,omitempty"`
+	UploadedAt     string      `json:"uploaded_at"`
+	UploadedAtTime time.Time   `json:"-"`
+}
+
+//type AccrualOrders2 struct {
+//	Order          string      `json:"order,omitempty"`
+//	NumberOrder    string      `json:"number"`
+//	Status         string      `json:"status"`
+//	Accrual        json.Number `json:"accrual,omitempty"`
+//	UploadedAt     string      `json:"uploaded_at"`
+//	UploadedAtTime time.Time   `json:"-"`
+//}
+//
+//type AccrualOrders3 struct {
+//	Order          string      `json:"order,omitempty"`
+//	NumberOrder    string      `json:"number"`
+//	Status         string      `json:"status"`
+//	Accrual        json.Number `json:"accrual,omitempty"`
+//	UploadedAt     string      `json:"uploaded_at"`
+//	UploadedAtTime time.Time   `json:"-"`
+//}
+
 func TotalWriteOff(conn *pgxpool.Pool, tk string) (float64, error) {
 	var totalWriteOff float64
 	err := conn.QueryRow(context.Background(),
@@ -82,15 +109,32 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 			return http.StatusInternalServerError, nil, 0,
 				errors.New("internal server error. Get /api/orders/number")
 		}
-		defer res.Body.Close()
+
 		err = json.NewDecoder(res.Body).Decode(&accrualDecode)
 		if err != nil && !errors.Is(io.EOF, err) {
 			log.Println("LoadedOrderNumbers: NewDecoder: ", err)
 			return http.StatusInternalServerError, nil, 0,
 				errors.New("internal server error. NewDecoder")
 		}
+		defer res.Body.Close()
 
-		if errors.Is(io.EOF, err) {
+		dec := json.NewDecoder(res.Body)
+		for {
+			t, err := dec.Token()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("%T: %v", t, t)
+			if dec.More() {
+				log.Printf(" (more)")
+			}
+			log.Printf("\n")
+		}
+
+		if !errors.Is(io.EOF, err) {
 			accrual.UploadedAt = accrual.UploadedAtTime.Format(time.RFC3339)
 			if accrualDecode.Status == "REGISTERED" {
 				accrual.Status = "NEW"
