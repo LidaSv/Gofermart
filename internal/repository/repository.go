@@ -25,7 +25,7 @@ type AccrualOrders struct {
 }
 
 type DecodeAccrualOrders struct {
-	Order   string      `json:"order"`
+	Order   interface{} `json:"number"`
 	Status  string      `json:"status"`
 	Accrual interface{} `json:"accrual,omitempty"`
 }
