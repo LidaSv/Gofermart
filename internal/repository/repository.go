@@ -110,14 +110,6 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 				errors.New("internal server error. Get /api/orders/number")
 		}
 
-		err = json.NewDecoder(res.Body).Decode(&accrualDecode)
-		if err != nil && !errors.Is(io.EOF, err) {
-			log.Println("LoadedOrderNumbers: NewDecoder: ", err)
-			return http.StatusInternalServerError, nil, 0,
-				errors.New("internal server error. NewDecoder")
-		}
-		defer res.Body.Close()
-
 		dec := json.NewDecoder(res.Body)
 		for {
 			t, err := dec.Token()
@@ -133,6 +125,14 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 			}
 			log.Printf("\n")
 		}
+
+		err = json.NewDecoder(res.Body).Decode(&accrualDecode)
+		if err != nil && !errors.Is(io.EOF, err) {
+			log.Println("LoadedOrderNumbers: NewDecoder: ", err)
+			return http.StatusInternalServerError, nil, 0,
+				errors.New("internal server error. NewDecoder")
+		}
+		defer res.Body.Close()
 
 		if !errors.Is(io.EOF, err) {
 			accrual.UploadedAt = accrual.UploadedAtTime.Format(time.RFC3339)
