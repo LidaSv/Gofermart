@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -23,9 +25,9 @@ type AccrualOrders struct {
 }
 
 type DecodeAccrualOrders struct {
-	Order   string  `json:"order"`
-	Status  string  `json:"status"`
-	Accrual float64 `json:"accrual,omitempty"`
+	Order   string      `json:"order"`
+	Status  string      `json:"status"`
+	Accrual interface{} `json:"accrual,omitempty"`
 }
 
 func TotalWriteOff(conn *pgxpool.Pool, tk string) (float64, error) {
@@ -120,13 +122,29 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 				accrual.Status = accrualDecode.Status
 			}
 
-			//num, err := accrualDecode.Accrual.Float64()
-			//if err != nil {
-			//	return http.StatusInternalServerError, nil, 0,
-			//		errors.New("internal server error. strconv.ParseFloat")
-			//}
-			balanceScore += accrualDecode.Accrual
-			accrual.Accrual = accrualDecode.Accrual
+			if accrualDecode.Accrual != nil {
+				switch v := accrualDecode.Accrual.(type) {
+				case float64:
+					balanceScore += v
+					accrual.Accrual = v
+				case string:
+					accrualValue, err := strconv.ParseFloat(v, 64)
+					if err == nil {
+						balanceScore += accrualValue
+						accrual.Accrual = accrualValue
+					} else {
+						log.Println("Error converting string to float64: ", err)
+						return http.StatusInternalServerError, nil, 0, errors.New("error converting string to float64")
+					}
+				case int:
+					balanceScore += float64(v)
+					accrual.Accrual = float64(v)
+				default:
+					fmt.Println("Unsupported type for Accrual value")
+					return http.StatusInternalServerError, nil, 0, errors.New("unsupported type for Accrual value")
+				}
+			}
+
 			accrual.Order = ""
 			orders = append(orders, accrual)
 		}
