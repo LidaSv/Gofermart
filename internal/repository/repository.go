@@ -14,40 +14,19 @@ import (
 )
 
 type AccrualOrders struct {
-	Order          string      `json:"order,omitempty"`
-	NumberOrder    string      `json:"number"`
-	Status         string      `json:"status"`
-	Accrual        json.Number `json:"accrual,omitempty"`
-	UploadedAt     string      `json:"uploaded_at"`
-	UploadedAtTime time.Time   `json:"-"`
+	Order          string    `json:"order,omitempty"`
+	NumberOrder    string    `json:"number"`
+	Status         string    `json:"status"`
+	Accrual        float64   `json:"accrual,omitempty"`
+	UploadedAt     string    `json:"uploaded_at"`
+	UploadedAtTime time.Time `json:"-"`
 }
 
-type AccrualOrders1 struct {
-	Order          string      `json:"order,omitempty"`
-	NumberOrder    string      `json:"number"`
-	Status         string      `json:"status"`
-	Accrual        json.Number `json:"accrual,omitempty"`
-	UploadedAt     string      `json:"uploaded_at"`
-	UploadedAtTime time.Time   `json:"-"`
+type DecodeAccrualOrders struct {
+	Order   string  `json:"order"`
+	Status  string  `json:"status"`
+	Accrual float64 `json:"accrual,omitempty"`
 }
-
-//type AccrualOrders2 struct {
-//	Order          string      `json:"order,omitempty"`
-//	NumberOrder    string      `json:"number"`
-//	Status         string      `json:"status"`
-//	Accrual        json.Number `json:"accrual,omitempty"`
-//	UploadedAt     string      `json:"uploaded_at"`
-//	UploadedAtTime time.Time   `json:"-"`
-//}
-//
-//type AccrualOrders3 struct {
-//	Order          string      `json:"order,omitempty"`
-//	NumberOrder    string      `json:"number"`
-//	Status         string      `json:"status"`
-//	Accrual        json.Number `json:"accrual,omitempty"`
-//	UploadedAt     string      `json:"uploaded_at"`
-//	UploadedAtTime time.Time   `json:"-"`
-//}
 
 func TotalWriteOff(conn *pgxpool.Pool, tk string) (float64, error) {
 	var totalWriteOff float64
@@ -90,12 +69,11 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 		AccrualURL = accrualSA + "/"
 	}
 
-	log.Println(AccrualURL)
-
 	var orders []AccrualOrders
 	var balanceScore float64
 	for rows.Next() {
-		var accrual, accrualDecode AccrualOrders
+		var accrual AccrualOrders
+		var accrualDecode DecodeAccrualOrders
 		err := rows.Scan(&accrual.NumberOrder, &accrual.UploadedAtTime)
 		if err != nil {
 			log.Println("LoadedOrderNumbers: scan rows: ", err)
@@ -110,21 +88,21 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 				errors.New("internal server error. Get /api/orders/number")
 		}
 
-		dec := json.NewDecoder(res.Body)
-		for {
-			t, err := dec.Token()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				log.Fatal(err)
-			}
-			log.Printf("%T: %v", t, t)
-			if dec.More() {
-				log.Printf(" (more)")
-			}
-			log.Printf("\n")
-		}
+		//dec := json.NewDecoder(res.Body)
+		//for {
+		//	t, err := dec.Token()
+		//	if err == io.EOF {
+		//		break
+		//	}
+		//	if err != nil {
+		//		log.Fatal(err)
+		//	}
+		//	log.Printf("%T: %v", t, t)
+		//	if dec.More() {
+		//		log.Printf(" (more)")
+		//	}
+		//	log.Printf("\n")
+		//}
 
 		err = json.NewDecoder(res.Body).Decode(&accrualDecode)
 		if err != nil && !errors.Is(io.EOF, err) {
@@ -142,12 +120,12 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 				accrual.Status = accrualDecode.Status
 			}
 
-			num, err := accrualDecode.Accrual.Float64()
-			if err != nil {
-				return http.StatusInternalServerError, nil, 0,
-					errors.New("internal server error. strconv.ParseFloat")
-			}
-			balanceScore += num
+			//num, err := accrualDecode.Accrual.Float64()
+			//if err != nil {
+			//	return http.StatusInternalServerError, nil, 0,
+			//		errors.New("internal server error. strconv.ParseFloat")
+			//}
+			balanceScore += accrualDecode.Accrual
 			accrual.Accrual = accrualDecode.Accrual
 			accrual.Order = ""
 			orders = append(orders, accrual)
