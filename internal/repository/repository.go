@@ -92,6 +92,15 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 		}
 		orders = append(orders, accrual)
 		balanceScore = balanceScore1
+
+		_, err = conn.Exec(context.Background(),
+			`insert into order_accrual (id_order, accrual) 
+				values ($1, $2)`,
+			accrual.NumberOrder, accrual.Accrual)
+		if err != nil {
+			log.Println("LoadedOrderNumbers: Insert into order_accrual: ", err)
+			return http.StatusInternalServerError, orders, balanceScore, err
+		}
 	}
 
 	if orders == nil {

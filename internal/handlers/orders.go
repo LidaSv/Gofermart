@@ -10,7 +10,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -130,13 +129,13 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 
 			var totalBalanceScore float64
 			err = c.DBconn.QueryRow(context.Background(),
-				`select total_balance_score
-					from balance 
-					where id_order = $1 and user_token=$2`,
-				idOrder, tk.Value).Scan(&totalBalanceScore)
+				`select accrual
+					from order_accrual 
+					where id_order = $1`,
+				idOrder).Scan(&totalBalanceScore)
 			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-				log.Println("UsersOrdersGet: select order_balance_score: ", err)
-				http.Error(w, "Internal server error. select order_balance_score", http.StatusInternalServerError)
+				log.Println("UsersOrdersGet: select accrual: ", err)
+				http.Error(w, "Internal server error. select accrual", http.StatusInternalServerError)
 				return
 			}
 
@@ -144,16 +143,7 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 				log.Println("no data")
 			}
 
-			var AccrualURL string
-			if strings.HasSuffix(c.AccrualSA, "/") {
-				AccrualURL = c.AccrualSA + "api/orders/"
-			} else {
-				AccrualURL = c.AccrualSA + "/api/orders/"
-			}
-			_, _, balanceScore1, err := repository.GetHTTP(AccrualURL+idOrder, order, 0)
-
-			order.Accrual = balanceScore1
-			log.Println("BALANCE: ", balanceScore1)
+			order.Accrual = totalBalanceScore
 			order.NumberOrder = idOrder
 			order.UploadedAt = uploadedAt.Format(time.RFC3339)
 			order.Status = "NEW"
