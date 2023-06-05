@@ -152,6 +152,6 @@ func GetHTTP(AccrualURL string, accrualDecode DecodeAccrualOrders, accrual Accru
 		balanceScore += accrualDecode.Accrual
 		accrual.Order = ""
 	}
-	log.Println("BALANCE: ", balanceScore)
+
 	return 0, accrual, balanceScore, nil
 }

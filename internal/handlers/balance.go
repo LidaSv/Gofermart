@@ -55,8 +55,7 @@ func (c *Config) UsersBalance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Println("AllBalance: ", balanceScore, totalWriteOff)
-	s := AllBalance{Current: balanceScore, Withdrawn: totalWriteOff}
+	s := AllBalance{Current: balanceScore - totalWriteOff, Withdrawn: totalWriteOff}
 
 	balance, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
