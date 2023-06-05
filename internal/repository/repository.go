@@ -144,10 +144,10 @@ func GetHTTP(AccrualURL string, accrual AccrualOrders, balanceScore float64) (in
 		}
 	}
 
-	if errors.Is(io.EOF, err) {
-		log.Println("LoadedOrderNumbers: no data to answer: ", err)
-		return http.StatusNoContent, accrual, balanceScore, errors.New("no data to answer in Get")
-	}
+	//if errors.Is(io.EOF, err) {
+	//	log.Println("LoadedOrderNumbers: no data to answer: ", err)
+	//	return http.StatusNoContent, accrual, balanceScore, errors.New("no data to answer in Get")
+	//}
 	defer res.Body.Close()
 
 	if !errors.Is(io.EOF, err) {
