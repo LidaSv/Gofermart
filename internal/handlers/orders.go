@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -139,8 +140,20 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			order.Accrual = totalBalanceScore
-			log.Println("BALANCE: ", totalBalanceScore)
+			if errors.Is(err, pgx.ErrNoRows) {
+				log.Println("no data")
+			}
+
+			var AccrualURL string
+			if strings.HasSuffix(c.AccrualSA, "/") {
+				AccrualURL = c.AccrualSA + "api/orders/"
+			} else {
+				AccrualURL = c.AccrualSA + "/api/orders/"
+			}
+			_, _, balanceScore1, err := repository.GetHTTP(AccrualURL+idOrder, order, 0)
+
+			order.Accrual = balanceScore1
+			log.Println("BALANCE: ", balanceScore1)
 			order.NumberOrder = idOrder
 			order.UploadedAt = uploadedAt.Format(time.RFC3339)
 			order.Status = "NEW"

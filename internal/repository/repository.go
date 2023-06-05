@@ -77,7 +77,6 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 	var balanceScore float64
 	for rows.Next() {
 		var accrual AccrualOrders
-		var accrualDecode DecodeAccrualOrders
 		err := rows.Scan(&accrual.NumberOrder, &accrual.UploadedAtTime)
 		if err != nil {
 			log.Println("LoadedOrderNumbers: scan rows: ", err)
@@ -86,7 +85,7 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 		}
 
 		//AccrualURL+accrual.NumberOrder
-		status, accrual, balanceScore1, err := GetHTTP(AccrualURL+accrual.NumberOrder, accrualDecode, accrual, balanceScore)
+		status, accrual, balanceScore1, err := GetHTTP(AccrualURL+accrual.NumberOrder, accrual, balanceScore)
 		if err != nil {
 			log.Println("LoadedOrderNumbers: Get /api/orders/{number}: ", err)
 			return status, nil, 0, err
@@ -103,7 +102,8 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 	return http.StatusOK, orders, balanceScore, nil
 }
 
-func GetHTTP(AccrualURL string, accrualDecode DecodeAccrualOrders, accrual AccrualOrders, balanceScore float64) (int, AccrualOrders, float64, error) {
+func GetHTTP(AccrualURL string, accrual AccrualOrders, balanceScore float64) (int, AccrualOrders, float64, error) {
+	var accrualDecode DecodeAccrualOrders
 	res, err := http.Get(AccrualURL)
 	if err != nil && !errors.Is(io.EOF, err) {
 		log.Println("LoadedOrderNumbers: http.Get(AccrualURL): ", err)
@@ -124,7 +124,7 @@ func GetHTTP(AccrualURL string, accrualDecode DecodeAccrualOrders, accrual Accru
 
 		select {
 		case <-t.C:
-			GetHTTP(AccrualURL, accrualDecode, accrual, balanceScore)
+			GetHTTP(AccrualURL, accrual, balanceScore)
 		case <-ctx.Done():
 			log.Println("Waiting for connection")
 			return http.StatusTooManyRequests, accrual, balanceScore, errors.New("unable to wait for connection")
