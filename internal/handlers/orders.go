@@ -127,23 +127,10 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			var totalBalanceScore float64
-			err = c.DBconn.QueryRow(context.Background(),
-				`select accrual
-					from order_accrual 
-					where id_order = $1`,
-				idOrder).Scan(&totalBalanceScore)
-			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-				log.Println("UsersOrdersGet: select accrual: ", err)
-				http.Error(w, "Internal server error. select accrual", http.StatusInternalServerError)
-				return
-			}
-
 			if errors.Is(err, pgx.ErrNoRows) {
 				log.Println("no data")
 			}
 
-			order.Accrual = totalBalanceScore
 			order.NumberOrder = idOrder
 			order.UploadedAt = uploadedAt.Format(time.RFC3339)
 			order.Status = "NEW"

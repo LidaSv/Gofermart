@@ -111,11 +111,9 @@ func GetHTTP(AccrualURL string, accrual AccrualOrders, balanceScore float64) (in
 			errors.New("internal server error. Get /api/orders/number")
 	}
 
-	if errors.Is(io.EOF, err) {
-		if res.StatusCode == http.StatusNoContent {
-			log.Println("io.EOF: ", err)
-			return http.StatusNoContent, accrual, balanceScore, errors.New("no data to answer in res.StatusCode")
-		}
+	if res.StatusCode == http.StatusNoContent {
+		log.Println("no data to answer in res.StatusCode: ", err)
+		return http.StatusNoContent, accrual, balanceScore, errors.New("no data to answer in res.StatusCode")
 	}
 
 	for res.StatusCode == http.StatusTooManyRequests {
@@ -135,7 +133,6 @@ func GetHTTP(AccrualURL string, accrual AccrualOrders, balanceScore float64) (in
 	}
 
 	if !errors.Is(io.EOF, err) {
-		//return http.StatusNoContent, accrual, balanceScore, errors.New("no data to answer in res.StatusCode")
 		err = json.NewDecoder(res.Body).Decode(&accrualDecode)
 		if err != nil && !errors.Is(io.EOF, err) {
 			log.Println("LoadedOrderNumbers: NewDecoder: ", err)
@@ -144,14 +141,15 @@ func GetHTTP(AccrualURL string, accrual AccrualOrders, balanceScore float64) (in
 		}
 	}
 
-	//if errors.Is(io.EOF, err) {
-	//	log.Println("LoadedOrderNumbers: no data to answer: ", err)
-	//	return http.StatusNoContent, accrual, balanceScore, errors.New("no data to answer in Get")
-	//}
+	if errors.Is(io.EOF, err) {
+		log.Println("LoadedOrderNumbers: no data to answer: ", err)
+		return http.StatusNoContent, accrual, balanceScore, errors.New("no data to answer in Get")
+	}
 	defer res.Body.Close()
 
 	if !errors.Is(io.EOF, err) {
 		accrual.UploadedAt = accrual.UploadedAtTime.Format(time.RFC3339)
+		accrual.Accrual = accrualDecode.Accrual
 		if accrualDecode.Status == "REGISTERED" {
 			accrual.Status = "NEW"
 		} else {
