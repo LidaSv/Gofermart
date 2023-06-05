@@ -103,13 +103,13 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 			from orders 
 			where user_token = $1`,
 			tk.Value).Scan(&cnt)
-		log.Println("ERR = ", err)
+
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			log.Println("UsersOrdersGet: select count(*): ", err)
 			http.Error(w, "Internal server error. Select cnt", http.StatusInternalServerError)
 			return
 		}
-		log.Println("Cnt = ", cnt.Int32)
+
 		if errors.Is(err, pgx.ErrNoRows) {
 			log.Println("UsersOrdersGet: errors.Is(err, pgx.ErrNoRows): ", err)
 			http.Error(w, "Internal server error. Select cnt", http.StatusNoContent)
@@ -121,15 +121,8 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		ordersMarshal, err := json.MarshalIndent(orders, "", "  ")
-		if err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			log.Println("UsersOrdersGet: json.MarshalIndent1: ", err)
-			return
-		}
-
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, string(ordersMarshal))
+		fmt.Fprint(w, "[]")
 		return
 	}
 
@@ -140,6 +133,6 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(status)
+	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, string(ordersMarshal))
 }
