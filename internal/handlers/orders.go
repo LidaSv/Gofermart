@@ -96,7 +96,6 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if status == http.StatusNoContent {
-		log.Print("i`m hear")
 		var cnt sql.NullInt32
 		err := c.DBconn.QueryRow(context.Background(),
 			`select count(*) cnt
@@ -121,7 +120,7 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusNoContent)
 		fmt.Fprint(w, "[]")
 		return
 	}
