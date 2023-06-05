@@ -101,7 +101,6 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 			from orders 
 			where user_token = $1`,
 			tk.Value)
-		defer rows.Close()
 
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			log.Println("UsersOrdersGet: select id_order, event_time: ", err)
@@ -114,6 +113,7 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Internal server error. Select idOrder", http.StatusNoContent)
 			return
 		}
+		defer rows.Close()
 
 		for rows.Next() {
 			var idOrder string
@@ -133,8 +133,14 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 					from balance 
 					where id_order = $1 and user_token=$2`,
 				idOrder, tk.Value).Scan(&balance)
+			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				log.Println("UsersOrdersGet: select order_balance_score: ", err)
+				http.Error(w, "Internal server error. select order_balance_score", http.StatusInternalServerError)
+				return
+			}
 
 			order.Accrual = balance
+			log.Println("BALANCE: ", balance)
 			order.NumberOrder = idOrder
 			order.UploadedAt = uploadedAt.Format(time.RFC3339)
 			order.Status = "NEW"

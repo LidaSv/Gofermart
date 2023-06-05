@@ -116,13 +116,19 @@ func GetHTTP(AccrualURL string, accrualDecode DecodeAccrualOrders, accrual Accru
 	}
 
 	for res.StatusCode == http.StatusTooManyRequests {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
 		t := time.NewTimer(3 * time.Second)
+		defer t.Stop()
+
 		select {
 		case <-t.C:
 			GetHTTP(AccrualURL, accrualDecode, accrual, balanceScore)
+		case <-ctx.Done():
+			return http.StatusTooManyRequests, accrual, balanceScore, errors.New("unable to wait for connection")
+			log.Println("Waiting for connection")
 		}
-		//time.Sleep(3 * time.Second)
-		//GetHTTP(AccrualURL, accrualDecode, accrual, balanceScore)
 	}
 
 	if !errors.Is(io.EOF, err) {
