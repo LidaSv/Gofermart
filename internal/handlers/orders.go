@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 func (c *Config) UsersOrdersDown(w http.ResponseWriter, r *http.Request) {
@@ -96,35 +96,42 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if status == http.StatusNoContent {
-		var cnt sql.NullInt32
-		err := c.DBconn.QueryRow(context.Background(),
-			`select count(*) cnt
+		rows, err := c.DBconn.Query(context.Background(),
+			`select id_order, event_time
 			from orders 
 			where user_token = $1`,
-			tk.Value).Scan(&cnt)
+			tk.Value)
+		defer rows.Close()
 
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			log.Println("UsersOrdersGet: select count(*): ", err)
-			http.Error(w, "Internal server error. Select cnt", http.StatusInternalServerError)
+			http.Error(w, "Internal server error. Select idOrder", http.StatusInternalServerError)
 			return
 		}
 
 		if errors.Is(err, pgx.ErrNoRows) {
 			log.Println("UsersOrdersGet: errors.Is(err, pgx.ErrNoRows): ", err)
-			http.Error(w, "Internal server error. Select cnt", http.StatusNoContent)
-			return
-		}
-		if !cnt.Valid {
-			log.Println("UsersOrdersGet: cnt.Valid: ", err)
-			http.Error(w, "Internal server error. Select cnt", http.StatusNoContent)
+			http.Error(w, "Internal server error. Select idOrder", http.StatusNoContent)
 			return
 		}
 
-		w.WriteHeader(http.StatusNoContent)
-		fmt.Fprint(w, "[]")
-		return
+		for rows.Next() {
+			var idOrder string
+			var uploadedAt time.Time
+			var order repository.AccrualOrders
+			err := rows.Scan(&idOrder, &uploadedAt)
+
+			if err != nil {
+				log.Println("LoadedOrderNumbers: scan rows: ", err)
+				http.Error(w, "Internal server error. Scan idOrder", http.StatusInternalServerError)
+				return
+			}
+			order.NumberOrder = idOrder
+			order.UploadedAt = uploadedAt.Format(time.RFC3339)
+			order.Status = "NEW"
+			orders = append(orders, order)
+		}
 	}
-
 	ordersMarshal, err := json.MarshalIndent(orders, "", "  ")
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)

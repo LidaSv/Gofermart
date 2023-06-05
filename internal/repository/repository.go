@@ -121,6 +121,7 @@ func GetHTTP(AccrualURL string, accrualDecode DecodeAccrualOrders, accrual Accru
 	}
 
 	if !errors.Is(io.EOF, err) {
+		//return http.StatusNoContent, accrual, balanceScore, errors.New("no data to answer in res.StatusCode")
 		err = json.NewDecoder(res.Body).Decode(&accrualDecode)
 		if err != nil && !errors.Is(io.EOF, err) {
 			log.Println("LoadedOrderNumbers: NewDecoder: ", err)
