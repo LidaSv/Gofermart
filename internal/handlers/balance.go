@@ -55,6 +55,7 @@ func (c *Config) UsersBalance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Println(balanceScore, totalWriteOff)
 	s := AllBalance{Current: balanceScore, Withdrawn: totalWriteOff}
 
 	balance, err := json.MarshalIndent(s, "", "  ")

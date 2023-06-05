@@ -20,7 +20,6 @@ type Configs struct {
 	RunAddress           string `env:"RUN_ADDRESS" envDefault:"localhost:8080"`
 	AccrualSystemAddress string `env:"ACCRUAL_SYSTEM_ADDRESS" envDefault:"http://localhost:8080"`
 	DatabaseURI          string `env:"DATABASE_URI" envDefault:"host=localhost port=6422 user=postgres password=123 dbname=postgres"`
-	//envDefault:"host=localhost port=6422 user=postgres password=123 dbname=postgres"
 }
 
 func AddServer() {
@@ -30,11 +29,6 @@ func AddServer() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	//FlagRunAddress := flag.String("a", cfg.RunAddress, "a string")
-	//FlagAccrualSystemAddress := flag.String("r", cfg.AccrualSystemAddress, "a string")
-	//FlagDatabaseURI := flag.String("d", cfg.DatabaseURI, "a string")
-	//flag.Parse()
 
 	db, err := CreateTables(cfg.DatabaseURI)
 	if err != nil {

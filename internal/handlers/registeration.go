@@ -32,20 +32,18 @@ type User struct {
 }
 
 func (c *Config) UsersRegister(w http.ResponseWriter, r *http.Request) {
-	//w.Header().Set(typeContentType, bodyContentTypeJSON)
+	w.Header().Set(typeContentType, bodyContentTypeJSON)
 
 	var user User
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
 		switch {
 		case user.Login == "":
-			w.WriteHeader(http.StatusBadRequest)
-			//w.Write([]byte("Invalid request format. Need to enter login"))
+			http.Error(w, "Invalid request format. Need to enter login", http.StatusBadRequest)
 			log.Println("UsersRegister: Invalid request format. Need to enter login")
 			return
 		case user.Password == "":
-			w.WriteHeader(http.StatusBadRequest)
-			//w.Write([]byte("Invalid request format. Need to enter password"))
+			http.Error(w, "Invalid request format. Need to enter password", http.StatusInternalServerError)
 			log.Println("UsersRegister: Invalid request format. Need to enter password")
 			return
 		}
@@ -56,14 +54,12 @@ func (c *Config) UsersRegister(w http.ResponseWriter, r *http.Request) {
 		`select count(*) from users where login = $1`,
 		user.Login).Scan(&count)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		//http.Error(w, "Internal server error", http.StatusInternalServerError)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		log.Println("UsersRegister: select count(*) from users: ", err)
 		return
 	}
 	if count > 0 {
-		//http.Error(w, "Login already taken", http.StatusConflict)
-		w.WriteHeader(http.StatusConflict)
+		http.Error(w, "Login already taken", http.StatusConflict)
 		log.Println("UsersRegister: Login already taken")
 		return
 	}
@@ -75,8 +71,7 @@ func (c *Config) UsersRegister(w http.ResponseWriter, r *http.Request) {
 		`insert into users (login, password) values ($1, $2)`,
 		user.Login, hashedPass)
 	if err != nil {
-		//http.Error(w, "Internal server error", http.StatusInternalServerError)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		log.Println("UsersRegister: insert into users (login, password): ", err)
 		return
 	}
@@ -96,14 +91,12 @@ func (c *Config) UsersLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case user.Login == "":
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("Invalid request format. Need to enter login"))
-			log.Println("UsersLogin: Need to enter login")
+			http.Error(w, "Invalid request format. Need to enter login", http.StatusBadRequest)
+			log.Println("UsersRegister: Invalid request format. Need to enter login")
 			return
 		case user.Password == "":
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("Invalid request format. Need to enter password"))
-			log.Println("UsersLogin: Need to enter password")
+			http.Error(w, "Invalid request format. Need to enter password", http.StatusInternalServerError)
+			log.Println("UsersRegister: Invalid request format. Need to enter password")
 			return
 		}
 	}

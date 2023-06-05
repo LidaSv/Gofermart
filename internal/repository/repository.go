@@ -115,9 +115,14 @@ func GetHTTP(AccrualURL string, accrualDecode DecodeAccrualOrders, accrual Accru
 		return http.StatusNoContent, accrual, balanceScore, errors.New("no data to answer in res.StatusCode")
 	}
 
-	if res.StatusCode == http.StatusTooManyRequests {
-		time.Sleep(3 * time.Second)
-		GetHTTP(AccrualURL, accrualDecode, accrual, balanceScore)
+	for res.StatusCode == http.StatusTooManyRequests {
+		t := time.NewTimer(3 * time.Second)
+		select {
+		case <-t.C:
+			GetHTTP(AccrualURL, accrualDecode, accrual, balanceScore)
+		}
+		//time.Sleep(3 * time.Second)
+		//GetHTTP(AccrualURL, accrualDecode, accrual, balanceScore)
 	}
 
 	if !errors.Is(io.EOF, err) {
@@ -147,5 +152,6 @@ func GetHTTP(AccrualURL string, accrualDecode DecodeAccrualOrders, accrual Accru
 		balanceScore += accrualDecode.Accrual
 		accrual.Order = ""
 	}
+	log.Println("BALANCE: ", balanceScore)
 	return 0, accrual, balanceScore, nil
 }

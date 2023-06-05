@@ -24,7 +24,6 @@ func CreateTables(FlagDatabaseURI string) (*pgxpool.Pool, error) {
 		log.Println("Failed to connect to the database:", err)
 		return nil, err
 	}
-	//defer db.Close()
 
 	ctx := context.Background()
 
