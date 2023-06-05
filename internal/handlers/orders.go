@@ -96,25 +96,28 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if status == http.StatusNoContent {
-		var totalWriteOff sql.NullInt32
+		log.Print("i`m hear")
+		var cnt sql.NullInt32
 		err := c.DBconn.QueryRow(context.Background(),
-			`select count(*)
+			`select count(*) cnt
 			from orders 
 			where user_token = $1`,
-			tk.Value).Scan(&totalWriteOff)
+			tk.Value).Scan(&cnt)
+		log.Println("ERR = ", err)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			log.Println("UsersOrdersGet: select count(*): ", err)
-			http.Error(w, "Internal server error. Select total_write_off", http.StatusInternalServerError)
+			http.Error(w, "Internal server error. Select cnt", http.StatusInternalServerError)
 			return
 		}
+		log.Println("Cnt = ", cnt.Int32)
 		if errors.Is(err, pgx.ErrNoRows) {
 			log.Println("UsersOrdersGet: errors.Is(err, pgx.ErrNoRows): ", err)
-			http.Error(w, "Internal server error. Select total_write_off", http.StatusNoContent)
+			http.Error(w, "Internal server error. Select cnt", http.StatusNoContent)
 			return
 		}
-		if !totalWriteOff.Valid {
-			log.Println("UsersOrdersGet: totalWriteOff.Valid: ", err)
-			http.Error(w, "Internal server error. Select total_write_off", http.StatusNoContent)
+		if !cnt.Valid {
+			log.Println("UsersOrdersGet: cnt.Valid: ", err)
+			http.Error(w, "Internal server error. Select cnt", http.StatusNoContent)
 			return
 		}
 

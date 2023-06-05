@@ -106,7 +106,7 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 func GetHTTP(AccrualURL string, accrualDecode DecodeAccrualOrders, accrual AccrualOrders, balanceScore float64) (int, AccrualOrders, float64, error) {
 	res, err := http.Get(AccrualURL)
 	if err != nil && !errors.Is(io.EOF, err) {
-		log.Println("LoadedOrderNumbers: Get /api/orders/{number}: ", err)
+		log.Println("LoadedOrderNumbers: http.Get(AccrualURL): ", err)
 		return http.StatusInternalServerError, accrual, balanceScore,
 			errors.New("internal server error. Get /api/orders/number")
 	}
