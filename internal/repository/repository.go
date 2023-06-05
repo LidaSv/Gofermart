@@ -112,7 +112,21 @@ func GetHTTP(AccrualURL string, accrualDecode DecodeAccrualOrders, accrual Accru
 	}
 
 	if res.StatusCode == http.StatusNoContent {
-		return http.StatusNoContent, accrual, balanceScore, errors.New("no data to answer in res.StatusCode")
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		t := time.NewTimer(3 * time.Second)
+		defer t.Stop()
+
+		select {
+		case <-t.C:
+			GetHTTP(AccrualURL, accrualDecode, accrual, balanceScore)
+			break
+		case <-ctx.Done():
+			log.Println("waiting for data")
+			return http.StatusNoContent, accrual, balanceScore, errors.New("waiting for data: no data to answer in res.StatusCode")
+		}
+
 	}
 
 	for res.StatusCode == http.StatusTooManyRequests {
@@ -125,9 +139,10 @@ func GetHTTP(AccrualURL string, accrualDecode DecodeAccrualOrders, accrual Accru
 		select {
 		case <-t.C:
 			GetHTTP(AccrualURL, accrualDecode, accrual, balanceScore)
+			break
 		case <-ctx.Done():
-			return http.StatusTooManyRequests, accrual, balanceScore, errors.New("unable to wait for connection")
 			log.Println("Waiting for connection")
+			return http.StatusTooManyRequests, accrual, balanceScore, errors.New("unable to wait for connection")
 		}
 	}
 

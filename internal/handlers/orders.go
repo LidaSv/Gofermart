@@ -127,20 +127,20 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			var balance float64
+			var totalBalanceScore float64
 			err = c.DBconn.QueryRow(context.Background(),
-				`select order_balance_score
+				`select total_balance_score
 					from balance 
 					where id_order = $1 and user_token=$2`,
-				idOrder, tk.Value).Scan(&balance)
+				idOrder, tk.Value).Scan(&totalBalanceScore)
 			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 				log.Println("UsersOrdersGet: select order_balance_score: ", err)
 				http.Error(w, "Internal server error. select order_balance_score", http.StatusInternalServerError)
 				return
 			}
 
-			order.Accrual = balance
-			log.Println("BALANCE: ", balance)
+			order.Accrual = totalBalanceScore
+			log.Println("BALANCE: ", totalBalanceScore)
 			order.NumberOrder = idOrder
 			order.UploadedAt = uploadedAt.Format(time.RFC3339)
 			order.Status = "NEW"
