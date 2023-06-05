@@ -93,7 +93,9 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, newErr)
 		log.Println("UsersOrdersGet: newErr: ", newErr)
 		return
-	} else {
+	}
+
+	if newErr == errors.New("no data to answer in res.StatusCode") {
 		var totalWriteOff sql.NullInt32
 		err := c.DBconn.QueryRow(context.Background(),
 			`select count(*)
@@ -101,15 +103,31 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 			where user_token = $1`,
 			tk.Value).Scan(&totalWriteOff)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			log.Println("TotalWriteOff: select max: ", err)
+			log.Println("UsersOrdersGet: select count(*): ", err)
 			http.Error(w, "Internal server error. Select total_write_off", http.StatusInternalServerError)
-		} else if errors.Is(err, pgx.ErrNoRows) {
+			return
+		}
+		if errors.Is(err, pgx.ErrNoRows) {
+			log.Println("UsersOrdersGet: errors.Is(err, pgx.ErrNoRows): ", err)
 			http.Error(w, "Internal server error. Select total_write_off", http.StatusNoContent)
+			return
 		}
 		if !totalWriteOff.Valid {
+			log.Println("UsersOrdersGet: totalWriteOff.Valid: ", err)
 			http.Error(w, "Internal server error. Select total_write_off", http.StatusNoContent)
+			return
 		}
+
+		ordersMarshal, err := json.MarshalIndent(orders, "", "  ")
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			log.Println("UsersOrdersGet: json.MarshalIndent1: ", err)
+			return
+		}
+
 		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, string(ordersMarshal))
+		return
 	}
 
 	ordersMarshal, err := json.MarshalIndent(orders, "", "  ")
