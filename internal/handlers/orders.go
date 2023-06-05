@@ -88,14 +88,14 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	status, orders, _, newErr := repository.LoadedOrderNumbers(c.DBconn, c.AccrualSA, tk.Value)
-	if newErr != nil && newErr != errors.New("no data to answer in res.StatusCode") {
+	if newErr != nil && status != http.StatusNoContent {
 		w.WriteHeader(status)
 		fmt.Fprint(w, newErr)
 		log.Println("UsersOrdersGet: newErr: ", newErr)
 		return
 	}
 
-	if newErr == errors.New("no data to answer in res.StatusCode") {
+	if status == http.StatusNoContent {
 		var totalWriteOff sql.NullInt32
 		err := c.DBconn.QueryRow(context.Background(),
 			`select count(*)
