@@ -7,13 +7,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"log"
 	"net/http"
-	"net/url"
-	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/LidaSv/Gofermart.git/internal/cookie"
 )
 
 const (
@@ -76,7 +76,7 @@ func (c *Config) UsersRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cookie := SetCookie(user.Login, user.Password)
+	cookie := cookie.SetCookie(user.Login, user.Password)
 	http.SetCookie(w, &cookie)
 
 	w.WriteHeader(http.StatusOK)
@@ -121,22 +121,9 @@ func (c *Config) UsersLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cookie := SetCookie(user.Login, user.Password)
+	cookie := cookie.SetCookie(user.Login, user.Password)
 	http.SetCookie(w, &cookie)
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("User successfully authenticated"))
-
-}
-
-func SetCookie(login, password string) http.Cookie {
-	time64 := time.Now().Unix()
-	timeInt := fmt.Sprint(time64)
-	token := login + password + timeInt
-	hashToken := md5.Sum([]byte(token))
-	hashedToken := hex.EncodeToString(hashToken[:])
-	livingTime := 60 * time.Minute
-	expiration := time.Now().Add(livingTime)
-	cookie := http.Cookie{Name: "token", Value: url.QueryEscape(hashedToken), Expires: expiration}
-	return cookie
 }

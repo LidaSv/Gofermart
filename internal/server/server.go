@@ -11,9 +11,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/LidaSv/Gofermart.git/internal/handlers"
 	"github.com/caarlos0/env/v6"
 	"github.com/go-chi/chi/v5"
+
+	"github.com/LidaSv/Gofermart.git/internal/handlers"
 )
 
 type Configs struct {
@@ -32,7 +33,7 @@ func AddServer() {
 
 	db, err := CreateTables(cfg.DatabaseURI)
 	if err != nil {
-		log.Fatal(err)
+		log.Println("CreateTables: ", err)
 	}
 
 	var s handlers.Config

@@ -2,8 +2,9 @@ package server
 
 import (
 	"context"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"log"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func ConnectDB(dbURL string) (*pgxpool.Pool, error) {
@@ -62,16 +63,6 @@ func CreateTables(FlagDatabaseURI string) (*pgxpool.Pool, error) {
 		log.Println("Failed to create balance table:", err)
 		return nil, err
 	}
-
-	//_, err = db.Exec(ctx,
-	//	`create table if not exists order_accrual (
-	//		id_order 	text not null unique,
-	//		accrual		numeric(14,2)
-	//		)`)
-	//if err != nil {
-	//	log.Println("Failed to create balance table:", err)
-	//	return nil, err
-	//}
 
 	return db, nil
 }

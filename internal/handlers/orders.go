@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/LidaSv/Gofermart.git/internal/repository"
-	"github.com/jackc/pgx/v5"
 	"log"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+
+	"github.com/LidaSv/Gofermart.git/internal/repository"
 )
 
 func (c *Config) UsersOrdersDown(w http.ResponseWriter, r *http.Request) {

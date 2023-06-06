@@ -5,13 +5,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"io"
 	"log"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type AccrualOrders struct {
@@ -39,10 +40,8 @@ func TotalWriteOff(conn *pgxpool.Pool, tk string) (float64, error) {
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		log.Println("TotalWriteOff: select max: ", err)
 		return 0, errors.New("internal server error. Select total_write_off")
-	} else if errors.Is(err, pgx.ErrNoRows) {
-		return 0, nil
 	}
-	if !totalWriteOff.Valid {
+	if errors.Is(err, pgx.ErrNoRows) || !totalWriteOff.Valid {
 		return 0, nil
 	}
 	return totalWriteOff.Float64, nil
@@ -84,7 +83,6 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 				errors.New("internal server error. Scan AccrualOrders")
 		}
 
-		//AccrualURL+accrual.NumberOrder
 		status, accrual, balanceScore1, err := GetHTTP(AccrualURL+accrual.NumberOrder, accrual, balanceScore)
 		if err != nil {
 			log.Println("LoadedOrderNumbers: Get /api/orders/{number}: ", err)
@@ -111,7 +109,7 @@ func GetHTTP(AccrualURL string, accrual AccrualOrders, balanceScore float64) (in
 			errors.New("internal server error. Get /api/orders/number")
 	}
 
-	if res.StatusCode == http.StatusNoContent {
+	if res.StatusCode == http.StatusNoContent || errors.Is(io.EOF, err) {
 		log.Println("no data to answer in res.StatusCode: ", err)
 		return http.StatusNoContent, accrual, balanceScore, errors.New("no data to answer in res.StatusCode")
 	}
@@ -139,11 +137,6 @@ func GetHTTP(AccrualURL string, accrual AccrualOrders, balanceScore float64) (in
 			return http.StatusInternalServerError, accrual, balanceScore,
 				errors.New("internal server error. NewDecoder")
 		}
-	}
-
-	if errors.Is(io.EOF, err) {
-		log.Println("LoadedOrderNumbers: no data to answer: ", err)
-		return http.StatusNoContent, accrual, balanceScore, errors.New("no data to answer in Get")
 	}
 	defer res.Body.Close()
 
