@@ -100,15 +100,15 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 	if errors.Is(newErr, errors.New(`no data to answer`)) {
 		ordersDB, err := repository.NoData(c.DBconn, tk.Value)
 		if err != nil {
-			switch newErr {
+			switch err {
 			case errors.New(`internal server error`):
 				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprint(w, newErr)
-				log.Println("UsersOrdersGet: internal server error: newErr: ", newErr)
+				fmt.Fprint(w, err)
+				log.Println("UsersOrdersGet: internal server error: newErr: ", err)
 			case errors.New(`no data to answer`):
 				w.WriteHeader(http.StatusNoContent)
-				fmt.Fprint(w, newErr)
-				log.Println("UsersOrdersGet: no data to answer: newErr: ", newErr)
+				fmt.Fprint(w, err)
+				log.Println("UsersOrdersGet: no data to answer: newErr: ", err)
 			}
 			return
 		}
