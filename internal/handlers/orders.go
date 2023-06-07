@@ -98,7 +98,6 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 	orders := ordersFull.Accrual
 
 	if errors.Is(newErr, repository.ErrNoData) {
-		log.Println("hear")
 		orders, err = repository.NoData(c.DBconn, tk.Value, orders)
 		if err != nil {
 			switch err {
@@ -114,7 +113,6 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		log.Println("hear2")
 	}
 
 	ordersMarshal, err := json.MarshalIndent(orders, "", "  ")
