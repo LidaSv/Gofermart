@@ -49,15 +49,23 @@ func (c *Config) UsersBalance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status, _, balanceScore, newErr := repository.LoadedOrderNumbers(c.DBconn, c.AccrualSA, tk.Value)
+	accrual, newErr := repository.LoadedOrderNumbers(c.DBconn, c.AccrualSA, tk.Value)
 	if newErr != nil {
-		w.WriteHeader(status)
-		fmt.Fprint(w, newErr)
-		log.Println("UsersBalance: newErr: ", newErr)
+		switch newErr {
+		case errors.New(`internal server error`):
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, newErr)
+			log.Println("UsersBalanceWithdraw: internal server error: newErr: ", newErr)
+		case errors.New(`no data to answer`):
+			w.WriteHeader(http.StatusNoContent)
+			fmt.Fprint(w, newErr)
+			log.Println("UsersBalanceWithdraw: no data to answer: newErr: ", newErr)
+		}
 		return
 	}
 
-	s := AllBalance{Current: balanceScore - totalWriteOff, Withdrawn: totalWriteOff}
+	currentBalance := accrual.BalanceScore - totalWriteOff
+	s := AllBalance{Current: currentBalance, Withdrawn: totalWriteOff}
 
 	balance, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
@@ -87,7 +95,7 @@ func (c *Config) UsersBalanceWithdraw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Order == "" {
-		http.Error(w, "Invalid order format", http.StatusBadRequest)
+		http.Error(w, "Invalid order format", http.StatusInternalServerError)
 		log.Println("UsersBalanceWithdraw: Order = nil")
 		return
 	}
@@ -113,15 +121,25 @@ func (c *Config) UsersBalanceWithdraw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status, _, balanceScore, newErr := repository.LoadedOrderNumbers(c.DBconn, c.AccrualSA, tk.Value)
+	accrual, newErr := repository.LoadedOrderNumbers(c.DBconn, c.AccrualSA, tk.Value)
 	if newErr != nil {
-		w.WriteHeader(status)
-		fmt.Fprint(w, newErr)
-		log.Println("UsersBalanceWithdraw: newErr: ", newErr)
+		switch newErr {
+		case errors.New(`internal server error`):
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, newErr)
+			log.Println("UsersBalanceWithdraw: internal server error: newErr: ", newErr)
+		case errors.New(`no data to answer`):
+			w.WriteHeader(http.StatusNoContent)
+			fmt.Fprint(w, newErr)
+			log.Println("UsersBalanceWithdraw: no data to answer: newErr: ", newErr)
+		}
 		return
 	}
 
-	if balanceScore-totalWriteOff-req.Score <= 0 {
+	sumWriteOff := totalWriteOff + req.Score
+	currentBalance := accrual.BalanceScore - sumWriteOff
+
+	if currentBalance <= 0 {
 		http.Error(w, "Insufficient funds in the account", http.StatusPaymentRequired)
 		log.Println("UsersBalanceWithdraw: Insufficient funds in the account")
 		return
@@ -131,7 +149,7 @@ func (c *Config) UsersBalanceWithdraw(w http.ResponseWriter, r *http.Request) {
 		`insert into balance (user_token, id_order, processed_at, 
                     total_balance_score, order_balance_score, total_write_off) 
 				values ($1, $2, now(), $3, $4, $5)`,
-		tk.Value, req.Order, balanceScore-totalWriteOff, req.Score, totalWriteOff+req.Score)
+		tk.Value, req.Order, currentBalance, req.Score, sumWriteOff)
 	if err != nil {
 		http.Error(w, "Internal server error. Insert into balance", http.StatusInternalServerError)
 		log.Println("UsersBalanceWithdraw: Insert into balance: ", err)

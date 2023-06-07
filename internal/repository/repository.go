@@ -15,6 +15,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type AccrualOrdersWithBalance struct {
+	Accrual      []AccrualOrders
+	BalanceScore float64
+}
+
 type AccrualOrders struct {
 	Order          string    `json:"order,omitempty"`
 	NumberOrder    string    `json:"number"`
@@ -47,7 +52,7 @@ func TotalWriteOff(conn *pgxpool.Pool, tk string) (float64, error) {
 	return totalWriteOff.Float64, nil
 }
 
-func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []AccrualOrders, float64, error) {
+func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (AccrualOrdersWithBalance, error) {
 	rows, err := conn.Query(context.Background(),
 		`select id_order, event_time
 			from orders
@@ -56,12 +61,11 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 		tk)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		log.Println("LoadedOrderNumbers: select id_order, event_time: ", err)
-		return http.StatusInternalServerError, nil, 0,
-			errors.New(`internal server error. Select id_order, event_time`)
+		return AccrualOrdersWithBalance{}, errors.New(`internal server error`)
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		log.Println("LoadedOrderNumbers: pgx.ErrNoRows")
-		return http.StatusNoContent, nil, 0, errors.New("no data to answer")
+		return AccrualOrdersWithBalance{}, errors.New(`no data to answer`)
 	}
 	defer rows.Close()
 
@@ -79,39 +83,41 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (int, []Accrua
 		err := rows.Scan(&accrual.NumberOrder, &accrual.UploadedAtTime)
 		if err != nil {
 			log.Println("LoadedOrderNumbers: scan rows: ", err)
-			return http.StatusInternalServerError, nil, 0,
-				errors.New("internal server error. Scan AccrualOrders")
+			return AccrualOrdersWithBalance{}, errors.New(`internal server error`)
 		}
 
-		status, accrual, balanceScore1, err := GetHTTP(AccrualURL+accrual.NumberOrder, accrual, balanceScore)
+		accrual, err = GetHTTP(AccrualURL+accrual.NumberOrder, accrual)
 		if err != nil {
 			log.Println("LoadedOrderNumbers: Get /api/orders/{number}: ", err)
-			return status, nil, 0, err
+			return AccrualOrdersWithBalance{}, err
 		}
 		orders = append(orders, accrual)
-		balanceScore = balanceScore1
+		balanceScore += accrual.Accrual
 	}
 
 	if orders == nil {
 		log.Println("LoadedOrderNumbers: no data to answer: ", err)
-		return http.StatusNoContent, nil, 0, errors.New("no data to answer")
+		return AccrualOrdersWithBalance{}, errors.New(`no data to answer`)
 	}
 
-	return http.StatusOK, orders, balanceScore, nil
+	var aowb AccrualOrdersWithBalance
+	aowb.Accrual = orders
+	aowb.BalanceScore = balanceScore
+
+	return AccrualOrdersWithBalance{}, nil
 }
 
-func GetHTTP(AccrualURL string, accrual AccrualOrders, balanceScore float64) (int, AccrualOrders, float64, error) {
+func GetHTTP(AccrualURL string, accrual AccrualOrders) (AccrualOrders, error) {
 	var accrualDecode DecodeAccrualOrders
 	res, err := http.Get(AccrualURL)
 	if err != nil && !errors.Is(io.EOF, err) {
 		log.Println("LoadedOrderNumbers: http.Get(AccrualURL): ", err)
-		return http.StatusInternalServerError, accrual, balanceScore,
-			errors.New("internal server error. Get /api/orders/number")
+		return accrual, errors.New(`internal server error`)
 	}
 
 	if res.StatusCode == http.StatusNoContent || errors.Is(io.EOF, err) {
 		log.Println("no data to answer in res.StatusCode: ", err)
-		return http.StatusNoContent, accrual, balanceScore, errors.New("no data to answer in res.StatusCode")
+		return accrual, errors.New(`no data to answer`)
 	}
 
 	for res.StatusCode == http.StatusTooManyRequests {
@@ -123,10 +129,10 @@ func GetHTTP(AccrualURL string, accrual AccrualOrders, balanceScore float64) (in
 
 		select {
 		case <-t.C:
-			GetHTTP(AccrualURL, accrual, balanceScore)
+			GetHTTP(AccrualURL, accrual)
 		case <-ctx.Done():
 			log.Println("Waiting for connection")
-			return http.StatusTooManyRequests, accrual, balanceScore, errors.New("unable to wait for connection")
+			return accrual, errors.New(`internal server error`)
 		}
 	}
 
@@ -134,8 +140,7 @@ func GetHTTP(AccrualURL string, accrual AccrualOrders, balanceScore float64) (in
 		err = json.NewDecoder(res.Body).Decode(&accrualDecode)
 		if err != nil && !errors.Is(io.EOF, err) {
 			log.Println("LoadedOrderNumbers: NewDecoder: ", err)
-			return http.StatusInternalServerError, accrual, balanceScore,
-				errors.New("internal server error. NewDecoder")
+			return accrual, errors.New(`internal server error`)
 		}
 	}
 	defer res.Body.Close()
@@ -149,9 +154,46 @@ func GetHTTP(AccrualURL string, accrual AccrualOrders, balanceScore float64) (in
 			accrual.Status = accrualDecode.Status
 		}
 
-		balanceScore += accrualDecode.Accrual
 		accrual.Order = ""
 	}
 
-	return 0, accrual, balanceScore, nil
+	return accrual, nil
+}
+
+func NoData(conn *pgxpool.Pool, tk string) ([]AccrualOrders, error) {
+	rows, err := conn.Query(context.Background(),
+		`select id_order, event_time
+			from orders 
+			where user_token = $1`,
+		tk)
+
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		log.Println("UsersOrdersGet: select id_order, event_time: ", err)
+		return nil, errors.New(`internal server error`)
+	}
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		log.Println("UsersOrdersGet: errors.Is(err, pgx.ErrNoRows): ", err)
+		return nil, errors.New(`no data to answer`)
+	}
+	defer rows.Close()
+
+	var orders []AccrualOrders
+	for rows.Next() {
+		var idOrder string
+		var uploadedAt time.Time
+		var order AccrualOrders
+		err := rows.Scan(&idOrder, &uploadedAt)
+
+		if err != nil {
+			log.Println("LoadedOrderNumbers: scan rows: ", err)
+			return nil, errors.New(`internal server error`)
+		}
+
+		order.NumberOrder = idOrder
+		order.UploadedAt = uploadedAt.Format(time.RFC3339)
+		order.Status = "NEW"
+		orders = append(orders, order)
+	}
+	return orders, nil
 }

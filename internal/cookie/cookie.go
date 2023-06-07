@@ -8,9 +8,8 @@ import (
 	"time"
 )
 
-func SetCookie(login, password string) http.Cookie {
-	token := login + password
-	hashToken := md5.Sum([]byte(token))
+func SetCookie(login string) http.Cookie {
+	hashToken := md5.Sum([]byte(login))
 	hashedToken := hex.EncodeToString(hashToken[:])
 	livingTime := 60 * time.Minute
 	expiration := time.Now().Add(livingTime)

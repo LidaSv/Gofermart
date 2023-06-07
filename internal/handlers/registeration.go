@@ -76,7 +76,7 @@ func (c *Config) UsersRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cookie := cookie.SetCookie(user.Login, user.Password)
+	cookie := cookie.SetCookie(user.Login)
 	http.SetCookie(w, &cookie)
 
 	w.WriteHeader(http.StatusOK)
@@ -121,7 +121,7 @@ func (c *Config) UsersLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cookie := cookie.SetCookie(user.Login, user.Password)
+	cookie := cookie.SetCookie(user.Login)
 	http.SetCookie(w, &cookie)
 
 	w.WriteHeader(http.StatusOK)

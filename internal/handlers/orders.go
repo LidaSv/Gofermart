@@ -5,12 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/jackc/pgx/v5"
 	"log"
 	"net/http"
 	"strconv"
-	"time"
-
-	"github.com/jackc/pgx/v5"
 
 	"github.com/LidaSv/Gofermart.git/internal/repository"
 )
@@ -89,56 +87,33 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status, orders, _, newErr := repository.LoadedOrderNumbers(c.DBconn, c.AccrualSA, tk.Value)
-	if newErr != nil && status != http.StatusNoContent {
-		w.WriteHeader(status)
+	ordersFull, newErr := repository.LoadedOrderNumbers(c.DBconn, c.AccrualSA, tk.Value)
+	if newErr != nil && !errors.Is(newErr, errors.New(`no data to answer`)) {
+		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, newErr)
-		log.Println("UsersOrdersGet: newErr: ", newErr)
+		log.Println("UsersOrdersGet: internal server error: newErr: ", newErr)
 		return
 	}
 
-	if status == http.StatusNoContent {
-		rows, err := c.DBconn.Query(context.Background(),
-			`select id_order, event_time
-			from orders 
-			where user_token = $1`,
-			tk.Value)
+	orders := ordersFull.Accrual
 
-		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			log.Println("UsersOrdersGet: select id_order, event_time: ", err)
-			http.Error(w, "Internal server error. Select idOrder", http.StatusInternalServerError)
-			return
-		}
-
-		if errors.Is(err, pgx.ErrNoRows) {
-			log.Println("UsersOrdersGet: errors.Is(err, pgx.ErrNoRows): ", err)
-			http.Error(w, "Internal server error. Select idOrder", http.StatusNoContent)
-			return
-		}
-		defer rows.Close()
-
-		for rows.Next() {
-			var idOrder string
-			var uploadedAt time.Time
-			var order repository.AccrualOrders
-			err := rows.Scan(&idOrder, &uploadedAt)
-
-			if err != nil {
-				log.Println("LoadedOrderNumbers: scan rows: ", err)
-				http.Error(w, "Internal server error. Scan idOrder", http.StatusInternalServerError)
-				return
+	if errors.Is(newErr, errors.New(`no data to answer`)) {
+		orders, err = repository.NoData(c.DBconn, tk.Value)
+		if err != nil {
+			switch newErr {
+			case errors.New(`internal server error`):
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Fprint(w, newErr)
+				log.Println("UsersOrdersGet: internal server error: newErr: ", newErr)
+			case errors.New(`no data to answer`):
+				w.WriteHeader(http.StatusNoContent)
+				fmt.Fprint(w, newErr)
+				log.Println("UsersOrdersGet: no data to answer: newErr: ", newErr)
 			}
-
-			if errors.Is(err, pgx.ErrNoRows) {
-				log.Println("no data")
-			}
-
-			order.NumberOrder = idOrder
-			order.UploadedAt = uploadedAt.Format(time.RFC3339)
-			order.Status = "NEW"
-			orders = append(orders, order)
+			return
 		}
 	}
+
 	ordersMarshal, err := json.MarshalIndent(orders, "", "  ")
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
