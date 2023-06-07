@@ -98,7 +98,7 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 	orders := ordersFull.Accrual
 
 	if errors.Is(newErr, errors.New(`no data to answer`)) {
-		orders, err = repository.NoData(c.DBconn, tk.Value)
+		ordersDB, err := repository.NoData(c.DBconn, tk.Value)
 		if err != nil {
 			switch newErr {
 			case errors.New(`internal server error`):
@@ -112,6 +112,7 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
+		orders = ordersDB
 	}
 
 	ordersMarshal, err := json.MarshalIndent(orders, "", "  ")
