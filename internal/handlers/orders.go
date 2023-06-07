@@ -98,19 +98,20 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 	orders := ordersFull.Accrual
 
 	if errors.Is(newErr, errors.New(`no data to answer`)) {
-		ordersDB, err := repository.NoData(c.DBconn, tk.Value)
-		if err != nil {
-			switch err {
+		ordersDB, errDB := repository.NoData(c.DBconn, tk.Value)
+		if errDB != nil {
+			switch errDB {
 			case errors.New(`internal server error`):
 				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprint(w, err)
-				log.Println("UsersOrdersGet: internal server error: newErr: ", err)
+				fmt.Fprint(w, errDB)
+				log.Println("UsersOrdersGet: internal server error: errDB: ", errDB)
+				return
 			case errors.New(`no data to answer`):
 				w.WriteHeader(http.StatusNoContent)
-				fmt.Fprint(w, err)
-				log.Println("UsersOrdersGet: no data to answer: newErr: ", err)
+				fmt.Fprint(w, errDB)
+				log.Println("UsersOrdersGet: no data to answer: errDB: ", errDB)
+				return
 			}
-			return
 		}
 		orders = ordersDB
 	}
