@@ -104,7 +104,7 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (AccrualOrders
 	aowb.Accrual = orders
 	aowb.BalanceScore = balanceScore
 
-	return AccrualOrdersWithBalance{}, nil
+	return aowb, nil
 }
 
 func GetHTTP(AccrualURL string, accrual AccrualOrders) (AccrualOrders, error) {
