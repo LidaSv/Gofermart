@@ -88,7 +88,7 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ordersFull, newErr := repository.LoadedOrderNumbers(c.DBconn, c.AccrualSA, tk.Value)
-	if newErr != nil && !errors.Is(newErr, errors.New(`no data to answer`)) {
+	if newErr != nil && !errors.Is(newErr, repository.ErrNoData) {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, newErr)
 		log.Println("UsersOrdersGet: internal server error: newErr: ", newErr)
@@ -97,12 +97,12 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 
 	orders := ordersFull.Accrual
 
-	if errors.Is(newErr, errors.New(`no data to answer`)) {
+	if errors.Is(newErr, repository.ErrNoData) {
 		log.Println("hear")
 		orders, err = repository.NoData(c.DBconn, tk.Value, orders)
 		if err != nil {
 			switch err {
-			case errors.New(`internal server error`):
+			case repository.ErrInternalServer:
 				w.WriteHeader(http.StatusInternalServerError)
 				fmt.Fprint(w, err)
 				log.Println("UsersOrdersGet: internal server error: errDB: ", err)

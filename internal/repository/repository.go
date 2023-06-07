@@ -15,6 +15,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+var (
+	ErrNoData         = errors.New(`no data to answer`)
+	ErrInternalServer = errors.New(`internal server error`)
+)
+
 type AccrualOrdersWithBalance struct {
 	Accrual      []AccrualOrders
 	BalanceScore float64
@@ -44,7 +49,7 @@ func TotalWriteOff(conn *pgxpool.Pool, tk string) (float64, error) {
 		tk).Scan(&totalWriteOff)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		log.Println("TotalWriteOff: select max: ", err)
-		return 0, errors.New("internal server error. Select total_write_off")
+		return 0, ErrInternalServer
 	}
 	if errors.Is(err, pgx.ErrNoRows) || !totalWriteOff.Valid {
 		return 0, nil
@@ -61,11 +66,11 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (AccrualOrders
 		tk)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		log.Println("LoadedOrderNumbers: select id_order, event_time: ", err)
-		return AccrualOrdersWithBalance{}, errors.New(`internal server error`)
+		return AccrualOrdersWithBalance{}, ErrInternalServer
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		log.Println("LoadedOrderNumbers: pgx.ErrNoRows")
-		return AccrualOrdersWithBalance{}, errors.New(`no data to answer`)
+		return AccrualOrdersWithBalance{}, ErrNoData
 	}
 	defer rows.Close()
 
@@ -83,7 +88,7 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (AccrualOrders
 		err := rows.Scan(&accrual.NumberOrder, &accrual.UploadedAtTime)
 		if err != nil {
 			log.Println("LoadedOrderNumbers: scan rows: ", err)
-			return AccrualOrdersWithBalance{}, errors.New(`internal server error`)
+			return AccrualOrdersWithBalance{}, ErrInternalServer
 		}
 
 		accrual, err = GetHTTP(AccrualURL+accrual.NumberOrder, accrual)
@@ -97,7 +102,7 @@ func LoadedOrderNumbers(conn *pgxpool.Pool, accrualSA, tk string) (AccrualOrders
 
 	if orders == nil {
 		log.Println("LoadedOrderNumbers: no data to answer: ", err)
-		return AccrualOrdersWithBalance{}, errors.New(`no data to answer`)
+		return AccrualOrdersWithBalance{}, ErrNoData
 	}
 
 	var aowb AccrualOrdersWithBalance
@@ -112,12 +117,12 @@ func GetHTTP(AccrualURL string, accrual AccrualOrders) (AccrualOrders, error) {
 	res, err := http.Get(AccrualURL)
 	if err != nil && !errors.Is(io.EOF, err) {
 		log.Println("LoadedOrderNumbers: http.Get(AccrualURL): ", err)
-		return accrual, errors.New(`internal server error`)
+		return accrual, ErrInternalServer
 	}
 
 	if res.StatusCode == http.StatusNoContent || errors.Is(io.EOF, err) {
 		log.Println("no data to answer in res.StatusCode: ", err)
-		return accrual, errors.New(`no data to answer`)
+		return accrual, ErrNoData
 	}
 
 	for res.StatusCode == http.StatusTooManyRequests {
@@ -132,7 +137,7 @@ func GetHTTP(AccrualURL string, accrual AccrualOrders) (AccrualOrders, error) {
 			GetHTTP(AccrualURL, accrual)
 		case <-ctx.Done():
 			log.Println("Waiting for connection")
-			return accrual, errors.New(`internal server error`)
+			return accrual, ErrInternalServer
 		}
 	}
 
@@ -140,7 +145,7 @@ func GetHTTP(AccrualURL string, accrual AccrualOrders) (AccrualOrders, error) {
 		err = json.NewDecoder(res.Body).Decode(&accrualDecode)
 		if err != nil && !errors.Is(io.EOF, err) {
 			log.Println("LoadedOrderNumbers: NewDecoder: ", err)
-			return accrual, errors.New(`internal server error`)
+			return accrual, ErrInternalServer
 		}
 	}
 	defer res.Body.Close()
@@ -169,12 +174,12 @@ func NoData(conn *pgxpool.Pool, tk string, orders []AccrualOrders) ([]AccrualOrd
 
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		log.Println("UsersOrdersGet: select id_order, event_time: ", err)
-		return nil, errors.New(`internal server error`)
+		return nil, ErrInternalServer
 	}
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		log.Println("UsersOrdersGet: errors.Is(err, pgx.ErrNoRows): ", err)
-		return nil, errors.New(`no data to answer`)
+		return nil, ErrNoData
 	}
 	defer rows.Close()
 
@@ -186,7 +191,7 @@ func NoData(conn *pgxpool.Pool, tk string, orders []AccrualOrders) ([]AccrualOrd
 		err := rows.Scan(&idOrder, &uploadedAt)
 		if err != nil {
 			log.Println("LoadedOrderNumbers: scan rows: ", err)
-			return nil, errors.New(`internal server error`)
+			return nil, ErrInternalServer
 		}
 
 		order.NumberOrder = idOrder

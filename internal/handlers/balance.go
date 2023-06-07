@@ -52,11 +52,11 @@ func (c *Config) UsersBalance(w http.ResponseWriter, r *http.Request) {
 	accrual, newErr := repository.LoadedOrderNumbers(c.DBconn, c.AccrualSA, tk.Value)
 	if newErr != nil {
 		switch newErr {
-		case errors.New(`internal server error`):
+		case repository.ErrInternalServer:
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, newErr)
 			log.Println("UsersBalanceWithdraw: internal server error: newErr: ", newErr)
-		case errors.New(`no data to answer`):
+		case repository.ErrNoData:
 			w.WriteHeader(http.StatusNoContent)
 			fmt.Fprint(w, newErr)
 			log.Println("UsersBalanceWithdraw: no data to answer: newErr: ", newErr)
@@ -124,11 +124,11 @@ func (c *Config) UsersBalanceWithdraw(w http.ResponseWriter, r *http.Request) {
 	accrual, newErr := repository.LoadedOrderNumbers(c.DBconn, c.AccrualSA, tk.Value)
 	if newErr != nil {
 		switch newErr {
-		case errors.New(`internal server error`):
+		case repository.ErrInternalServer:
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, newErr)
 			log.Println("UsersBalanceWithdraw: internal server error: newErr: ", newErr)
-		case errors.New(`no data to answer`):
+		case repository.ErrNoData:
 			w.WriteHeader(http.StatusNoContent)
 			fmt.Fprint(w, newErr)
 			log.Println("UsersBalanceWithdraw: no data to answer: newErr: ", newErr)
