@@ -160,7 +160,7 @@ func GetHTTP(AccrualURL string, accrual AccrualOrders) (AccrualOrders, error) {
 	return accrual, nil
 }
 
-func NoData(conn *pgxpool.Pool, tk string) ([]AccrualOrders, error) {
+func NoData(conn *pgxpool.Pool, tk string, orders []AccrualOrders) ([]AccrualOrders, error) {
 	rows, err := conn.Query(context.Background(),
 		`select id_order, event_time
 			from orders 
@@ -178,13 +178,12 @@ func NoData(conn *pgxpool.Pool, tk string) ([]AccrualOrders, error) {
 	}
 	defer rows.Close()
 
-	var orders []AccrualOrders
 	for rows.Next() {
 		var idOrder string
 		var uploadedAt time.Time
 		var order AccrualOrders
-		err := rows.Scan(&idOrder, &uploadedAt)
 
+		err := rows.Scan(&idOrder, &uploadedAt)
 		if err != nil {
 			log.Println("LoadedOrderNumbers: scan rows: ", err)
 			return nil, errors.New(`internal server error`)

@@ -98,22 +98,23 @@ func (c *Config) UsersOrdersGet(w http.ResponseWriter, r *http.Request) {
 	orders := ordersFull.Accrual
 
 	if errors.Is(newErr, errors.New(`no data to answer`)) {
-		ordersDB, errDB := repository.NoData(c.DBconn, tk.Value)
-		if errDB != nil {
-			switch errDB {
+		log.Println("hear")
+		orders, err = repository.NoData(c.DBconn, tk.Value, orders)
+		if err != nil {
+			switch err {
 			case errors.New(`internal server error`):
 				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprint(w, errDB)
-				log.Println("UsersOrdersGet: internal server error: errDB: ", errDB)
+				fmt.Fprint(w, err)
+				log.Println("UsersOrdersGet: internal server error: errDB: ", err)
 				return
 			case errors.New(`no data to answer`):
 				w.WriteHeader(http.StatusNoContent)
-				fmt.Fprint(w, errDB)
-				log.Println("UsersOrdersGet: no data to answer: errDB: ", errDB)
+				fmt.Fprint(w, err)
+				log.Println("UsersOrdersGet: no data to answer: errDB: ", err)
 				return
 			}
 		}
-		orders = ordersDB
+		log.Println("hear2")
 	}
 
 	ordersMarshal, err := json.MarshalIndent(orders, "", "  ")
